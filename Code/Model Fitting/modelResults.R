@@ -636,6 +636,16 @@ percentInd <-
              n = nrow(dataFinal),
              Freq = dataFinal$individual %>% unique() %>% length()); percentInd
 
+percentEmployed <-
+  dataFinal %>% 
+  dplyr::select(individual, exposed) %>% 
+  dplyr::distinct() %>% 
+  dplyr::select(-individual) %>% 
+  dplyr::summarise(n = n(), .by = 'exposed') %>% 
+  dplyr::mutate(freq = round(n/sum(n) * 100, digits = 2),
+                exposed = exposed %>% factor(., levels = c('Exposed', 'Control'), labels = c('Unemployed', 'Not unemployed'))) %>% 
+  dplyr::arrange(exposed); percentEmployed
+
 percentAge <-
   dataFinal %>% 
   dplyr::select(individual, age) %>% 
