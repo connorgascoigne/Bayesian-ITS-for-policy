@@ -32,16 +32,8 @@ We do not supply the data, but list what data sources we use, and how they were 
 2.  Run the `modelFit.R` to finalise the data processes, fit the model, produce samples from the posterior and save any relevant parts.
     -   Additional data processing: combining with Local Authority data for when the intervention begins, define the weights.
     -   Saved objects: final data set, model fit, and draws from the full linear predictor, observations, spatial and temporal random effects.
-
-```{=html}
-<!-- -->
-```
 3.  Run the `modelResults.R` to produce the plots, tables, and additional results seen in both the Manuscript and Supplementary Material.
     -   Must be run **after** `modelFit.R`
-
-```{=html}
-<!-- -->
-```
 4.  Run the `sensitivityAnalysis.R` to perform the sensitivity analysis on the definition of when the intervention started.
 
 ### Additional files
