@@ -1,0 +1,15 @@
+% latex table generated in R 4.2.1 by xtable 1.8-4 package
+% Wed Nov 15 10:39:26 2023
+\begin{table}[ht]
+\centering
+\begin{tabular}{lll}
+  \hline
+LSOA11CD & LSOA11NM & GROUP \\ 
+  \hline
+E01032522 & Nottingham 028F & Census 2001 \\ 
+  E01032540 & Hartlepool 003G & Census 2001 \\ 
+  E01032608 & Leeds 067K & Census 2001 \\ 
+  E01033730 & Greenwich 035D & Census 2001 \\ 
+   \hline
+\end{tabular}
+\end{table}

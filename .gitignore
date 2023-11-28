@@ -55,6 +55,10 @@ Data/
 # rds files
 *.rds
 
+# txt files
+*.txt
+
 # manuscript folder
 Manuscript/
 
+.Rproj.user

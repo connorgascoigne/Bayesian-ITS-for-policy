@@ -1,0 +1,23 @@
+% latex table generated in R 4.2.1 by xtable 1.8-4 package
+% Wed Nov 15 10:36:45 2023
+\begin{table}[ht]
+\centering
+\begin{tabular}{lll}
+  \hline
+LSOA11CD & LSOA11NM & GROUP \\ 
+  \hline
+E01032522 & Nottingham 028F & IMD 2004 \\ 
+  E01032540 & Hartlepool 003G & IMD 2004 \\ 
+  E01032608 & Leeds 067K & IMD 2004 \\ 
+  E01033730 & Greenwich 035D & IMD 2004 \\ 
+  E01032522 & Nottingham 028F & IMD 2007 \\ 
+  E01032540 & Hartlepool 003G & IMD 2007 \\ 
+  E01032608 & Leeds 067K & IMD 2007 \\ 
+  E01033730 & Greenwich 035D & IMD 2007 \\ 
+  E01032522 & Nottingham 028F & IMD 2010 \\ 
+  E01032540 & Hartlepool 003G & IMD 2010 \\ 
+  E01032608 & Leeds 067K & IMD 2010 \\ 
+  E01033730 & Greenwich 035D & IMD 2010 \\ 
+   \hline
+\end{tabular}
+\end{table}

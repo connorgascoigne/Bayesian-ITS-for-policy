@@ -14,6 +14,7 @@ codePathSplitted <- strsplit(codePath, "/")[[1]]
 homeDir <- paste(codePathSplitted[1: (length(codePathSplitted)-3)], collapse = "/")
 codeDir <- paste0(homeDir, '/Code')
 dataDir <- paste0(homeDir, '/Data')
+spatDir <- paste0(dataDir, '/shapeFiles')
 resDir <- paste0(homeDir, '/Results')
 resDir_dataExploration <- paste0(resDir, '/Data Exploration')
 
@@ -42,135 +43,82 @@ source(paste0(codeDir, '/functions.R'))
 
 ### load in the data ----
 
-onsShapePath <- 'Data/shapeFiles_ons2/'
-lsoaPoly <- sf::st_read(paste0(onsShapePath, 'ons21_GBR_LSOA_shp/ons21_GBR_LSOA.shp'))
-ltlaPoly <- sf::st_read(paste0(onsShapePath, 'ons21_GBR_LTLA_shp/ons21_GBR_LTLA.shp'))
-countryPoly <- sf::st_read(paste0(onsShapePath, 'ons21_GBR_country_shp/ons21_GBR_country.shp'))
+# spatial polygons at lsoa, lad and nat levels
+poly.lsoa <- sf::st_read(dsn = spatDir, layer = 'ONS11_LSOA')
+poly.lad <- sf::st_read(dsn = spatDir, layer = 'ONS22_LAD')
+poly.nat <- sf::st_read(dsn = spatDir, layer = 'ONS21_NAT')
 
-lsoaPoly_England <- 
-  lsoaPoly %>% 
-  dplyr::filter(str_detect(LSOA21CD, "^E"))
-ltlaPoly_England <-
-  ltlaPoly %>%
-  dplyr::filter(str_detect(LAD21CD, "^E"))
-countryPoly_England <-
-  countryPoly %>%
-  dplyr::filter(str_detect(CTRY21CD, "^E"))
+### organised ----
+
+poly.lsoa.england <- poly.lsoa %>%  dplyr::filter(str_detect(LSOA11CD, '^E'))
+poly.lad.england <- poly.lad %>%  dplyr::filter(str_detect(LAD22CD, '^E'))
+poly.nat.england <- poly.nat %>%  dplyr::filter(str_detect(CTRY21CD, '^E'))
+
+spatialPlotSimple <- FALSE
+if(spatialPlotSimple){
+  # less detailed but quicker plots
+  poly.lsoa.england <-
+    poly.lsoa.england %>%
+    sf::st_simplify(., preserveTopology = TRUE, dTolerance = 1000)
+  poly.lad.england <-
+    poly.lad.england %>%
+    sf::st_simplify(., preserveTopology = TRUE, dTolerance = 1000)
+  poly.nat.england <-
+    poly.nat.england %>%
+    sf::st_simplify(., preserveTopology = TRUE, dTolerance = 1000)
+}
+
+### raw data ----
+
+setwd(dataDir)
 
 # look up from 2011 lsoa to 2021 lsoa and 2021 ltla
-lsoa11_lookup <- 
-  read.csv('Data/rawData/UK Gov/lsoa11_to_lsao21_and_ltla22.csv') %>% 
-  dplyr::rename(LAD21NM = 'LAD22NM',
-                LAD21CD = 'LAD22CD') %>% 
-  dplyr::filter(str_detect(LSOA11CD, "^E"))
+lookup.01.11 <- read.csv('rawData/UK Gov/LSOA01_LSOA11_LAD11_lookUp.csv')
+lookup.11.21 <- read.csv('rawData/UK Gov/LSOA11_LSOA21_LAD22_lookUp.csv')
 
-### simplify ----
+# imd data
+load('Organised Data/LSOA11_2002_2021_IMD.rda')
+# ethncity data
+load('Organised Data/LSOA11_2002_2021_ETHNIC_DIVERSITY.rda')
+# UC data
+statXplore <- readxl::read_excel(path = 'rawData/Stat-Xplore/statxploreDat.xlsx', skip = 9)
+# survey data
+surveyData <- readRDS('Organised Data/ukhls_final.rds')
 
-# lsoaPoly_England_simple <-
-#   lsoaPoly_England %>%
-#   sf::st_simplify(., preserveTopology = TRUE, dTolerance = 1000)
-# ltlaPoly_England_simple <-
-#   ltlaPoly_England %>%
-#   sf::st_simplify(., preserveTopology = TRUE, dTolerance = 1000)
-# countryPoly_England_simple <-
-#   countryPoly_England %>%
-#   sf::st_simplify(., preserveTopology = TRUE, dTolerance = 1000)
+### sorted data ----
 
+# imd
+imd.02.21.sorted <-
+  imd.02.21 %>%
+  dplyr::mutate(DEPRIVATION = imdDecile %>% factor()) %>%
+  dplyr::select(LSOA11CD, YEAR, DEPRIVATION)
 
-# full detail for FINAL plots
-lsoaPoly_England_simple <-
-  lsoaPoly_England
-ltlaPoly_England_simple <-
-  ltlaPoly_England
-countryPoly_England_simple <-
-  countryPoly_England
+# ethnicity
+ed.02.21.sorted <-
+  ed.02.21 %>%
+  dplyr::mutate(DIVERSITY =
+                  dplyr::case_when(Asian + Black + Mixed + Other < 0.09 ~ 4,
+                                   0.09 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.18 ~ 3,
+                                   0.18 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.36 ~ 2,
+                                   TRUE ~ 1) %>%
+                  factor()) %>%
+  dplyr::select(LSOA11CD, YEAR, DIVERSITY)
 
-## imd data ----
-
-### raw ----
-
-imd2011 <- 
-  read.csv('Data/rawData/UK Gov/imd2011_lsoa.csv') %>%
-  dplyr::select(`LSOA.code..2011.`,
-                `LSOA.name..2011.`,
-                `Index.of.Multiple.Deprivation..IMD..Rank..where.1.is.most.deprived.`) %>%
-  dplyr::rename('LSOA11CD' = `LSOA.code..2011.`,
-                'LSOA11NM' = `LSOA.name..2011.`,
-                'imdRank' = `Index.of.Multiple.Deprivation..IMD..Rank..where.1.is.most.deprived.`)
-
-### organised ----
-
-# deprivation data
-deprivationData <- 
-  lsoaPoly_England %>% 
-  dplyr::select(LSOA21CD, LSOA21NM) %>% 
-  dplyr::left_join(., lsoa11_lookup %>% dplyr::select(LSOA11CD, LAD21CD, LAD21NM, LSOA21CD), by = 'LSOA21CD') %>% 
-  dplyr::left_join(., imd2011, by = 'LSOA11CD') %>% 
-  dplyr::select(LSOA11CD, LSOA21CD, LSOA21NM, LAD21CD, LAD21NM, imdRank) %>%
-  # include tiles
-  dplyr::mutate(imd10 = dplyr::ntile(imdRank, 10) %>% factor(., labels = 1:10),
-                imd5 = dplyr::ntile(imdRank, 5) %>% factor(., labels = 1:5),
-                imd4 = dplyr::ntile(imdRank, 4) %>% factor(., labels = 1:4))
-
-## ethnicity data ----
-
-### raw ----
-
-ethnicity2021 <- 
-  read.csv(file = 'Data/rawData/UK Gov/ethnicity2021_lsoa.csv', stringsAsFactors = TRUE) %>%
-  dplyr::rename('LSOA21CD' = 'Lower.layer.Super.Output.Areas.Code',
-                'ethnicityCD' = 'Ethnic.group..20.categories..Code',
-                'count' = 'Observation') %>%
-  # aggregate counts over bame and non-bame
-  dplyr::mutate(ethnicityGroup = dplyr::if_else(ethnicityCD %in% 13:17, 'nonBameCount', 'bameCount')) %>% 
-  dplyr::summarise(count = sum(count),
-                   .by = c('LSOA21CD', 'ethnicityGroup')) %>%
-  tidyr::pivot_wider(names_from = ethnicityGroup, 
-                     values_from = count) %>% 
-  dplyr::mutate(
-    # percentages
-    bamePercentage = bameCount/(bameCount + nonBameCount),
-    nonBamePercentage = nonBameCount/(bameCount + nonBameCount),
-    # rank based on percentage
-    bameRank = bamePercentage %>% dplyr::desc() %>% dplyr::dense_rank())
-
-### organised ----
-
-# diversity data
-diversityData <-
-  lsoaPoly_England %>% 
-  dplyr::select(LSOA21CD, LSOA21NM) %>% 
-  dplyr::left_join(., lsoa11_lookup %>% dplyr::select(LSOA11CD, LAD21CD, LAD21NM, LSOA21CD), by = 'LSOA21CD') %>% 
-  dplyr::left_join(., ethnicity2021, by = 'LSOA21CD') %>% 
-  dplyr::select(LSOA11CD, LSOA21CD, LSOA21NM, LAD21CD, LAD21NM, bamePercentage, bameRank) %>%
-  # include tiles
-  dplyr::mutate(bame5 = ggplot2::cut_interval((1-bamePercentage), n = 10) %>% factor(., labels = 1:10),
-                bame5 = ggplot2::cut_interval((1-bamePercentage), n = 5) %>% factor(., labels = 1:5),
-                bame4 = ggplot2::cut_interval((1-bamePercentage), n = 4) %>% factor(., labels = 1:4))
-
-## UC data ----
-
-### raw ----
-
-# import so the row names are the months
-statXplore <- readxl::read_excel(path = 'Data/rawData/Stat-Xplore/statxploreDat.xlsx', skip = 9)
-
-### organised ----
-
+# uc
 ucAwareness <- 0.25
 ucStartData <-
   statXplore %>%
   # remove unwanted rows and columns
   dplyr::select(-Month) %>%
-  dplyr::rename(LAD21NM = 1) %>%
+  dplyr::rename(LAD22NM = 1) %>%
   na.omit() %>%
-  dplyr::filter(!LAD21NM %in% c('Unknown', 'Total')) %>%
+  dplyr::filter(!LAD22NM %in% c('Unknown', 'Total')) %>%
   # mutating 
   ## '..' to NA -> NA to 0 -> character column to numeric
   dplyr::mutate(dplyr::across(tidyselect::where(is.character), ~ dplyr::na_if(., '..')),
-                dplyr::across(-LAD21NM, ~ replace(., is.na(.), 0)),
-                dplyr::across(-LAD21NM, ~ as.numeric(.))) %>%
-  tidyr::pivot_longer(cols = !LAD21NM,
+                dplyr::across(-LAD22NM, ~ replace(., is.na(.), 0)),
+                dplyr::across(-LAD22NM, ~ as.numeric(.))) %>%
+  tidyr::pivot_longer(cols = !LAD22NM,
                       names_to = c('month', 'year'),
                       names_sep = ' ',
                       values_to = 'total') %>%
@@ -180,9 +128,9 @@ ucStartData <-
   dplyr::filter(ucStartDate < '2022-01-01') %>% 
   # filter all the regions great than 20% of final value
   ## group within region
-  dplyr::group_by(LAD21NM) %>%
+  dplyr::group_by(LAD22NM) %>%
   ## arrange each region into date order
-  dplyr::arrange(LAD21NM, ucStartDate) %>%
+  dplyr::arrange(LAD22NM, ucStartDate) %>%
   ## add a counter
   dplyr::mutate(element = 1:n()) %>%
   ## filter for the first time the total is greater than 20% of the most recent value
@@ -190,117 +138,195 @@ ucStartData <-
   ## remove all but the first time this occurs
   dplyr::filter(ucStartDate == min(ucStartDate)) %>%
   dplyr::ungroup() %>%
-  dplyr::select(LAD21NM, ucStartDate) %>%
+  dplyr::select(LAD22NM, ucStartDate) %>%
   # !!!need to include the space ' /'!!!
-  dplyr::mutate(LAD21NM = sub(" /.*", "", LAD21NM))
+  dplyr::mutate(LAD22NM = sub(" /.*", "", LAD22NM))
 
-## survey data ----
-
-### raw ----
-
-surveyData <- readRDS('Data/Organised Data/ukhls_final.rds')
-
-### organised ----
-
+# survey
 surveyDataFinal <- 
   surveyData %>%
   # rename
-  dplyr::rename(c('id' = 'pidp', 'localAuthority' = 'LAD21NM', 'edu' = 'qfhigh', 
-                  'marStat' = 'mastat', 'jobStatus' = 'jbstat', 'ghq' = 'scghq2'))  %>%
+  dplyr::rename(c('id' = 'pidp', 'edu' = 'qfhigh', 'marStat' = 'mastat', 'jobStatus' = 'jbstat', 'ghq' = 'scghq2'))  %>%
   # uc start data
-  dplyr::left_join(., ucStartData, by = c('localAuthority' = 'LAD21NM'))
+  dplyr::left_join(., ucStartData, by = 'LAD22NM')
 
 # plots ----
 
+setwd(resDir_dataExploration)
+
 ## spatial maps ----
+
+### lad map ----
+
+ladPlot <- 
+  ggplot2::ggplot() +
+  # England outline filled in with white - must be first
+  ggplot2::geom_sf(data = poly.nat.england, fill = NA) +
+  ggplot2::geom_sf(data = poly.lad.england, fill = NA, colour = 'black') + 
+  my.map.theme(text = element_text(size = textSize))
+if(spatialPlotSimple){ladPlot}
+
+ggplot2::ggsave(ladPlot,
+                filename = 'ladPlot.png',
+                width = width, height = height)
+
+### lsoa map ----
+
+lsoaPlot <- 
+  ggplot2::ggplot() +
+  # England outline filled in with white - must be first
+  ggplot2::geom_sf(data = poly.nat.england, fill = NA) +
+  ggplot2::geom_sf(data = poly.lsoa.england, fill = NA, colour = 'black') + 
+  my.map.theme(text = element_text(size = textSize))
+if(spatialPlotSimple){ladPlot}
+
+ggplot2::ggsave(lsoaPlot,
+                filename = 'lsoaPlot.png',
+                width = width, height = height)
 
 ### UC roll out ----
 
 ucPlotData <-
   ucStartData %>%
-  dplyr::left_join(., ltlaPoly_England_simple, by = 'LAD21NM') %>%
+  dplyr::left_join(., poly.lad.england, by = 'LAD22NM') %>%
   sf::st_as_sf() %>%
   dplyr::mutate(ucStartYear = ucStartDate %>% format(., '%Y') %>% factor())
 
 ucPlot <- 
   ggplot2::ggplot() +
   # England outline filled in with white - must be first
-  ggplot2::geom_sf(data = countryPoly_England_simple, fill = 'white') +
-  ggplot2::geom_sf(data = ucPlotData, fill = scales::viridis_pal(option = 'G')(20)[20]) + 
-  ggplot2::facet_wrap(~ ucStartYear) +
+  ggplot2::geom_sf(data = poly.nat.england, fill = 'white') +
+  ggplot2::geom_sf(data = ucPlotData, aes(fill = ucStartYear)) +
+  ggplot2::scale_fill_viridis_d(name = 'Universal Credit\nStart Year', direction = -1, option = 'G', na.value = 'red') +
   my.map.theme(text = element_text(size = textSize))
-# ucPlot
+if(spatialPlotSimple){ucPlot}
 
 ggplot2::ggsave(ucPlot,
-                filename = paste0(resDir_dataExploration, '/ucPlot.png'),
+                filename = 'ucPlot.png',
                 width = width, height = height)
 
 ### deprivation ----
 
 deprivationPlotData <-
-  deprivationData %>%
-  dplyr::mutate(imd10_v2 = imd10 %>% factor(., labels = c('1 (Most)', 2:9, '10 (Least)')))
+  expand.grid(LSOA11CD = poly.lsoa.england$LSOA11CD,
+              imd.years = c('Deprivation 2004', 'Deprivation 2007', 'Deprivation 2010', 'Deprivation 2015', 'Deprivation 2019')) %>% 
+  dplyr::left_join(.,
+                   imd.02.21.sorted %>% 
+                     dplyr::filter(YEAR %in% c(2004, 2007, 2010, 2015, 2019)) %>% 
+                     dplyr::mutate(imd.years = paste0('Deprivation ', YEAR)) %>% 
+                     dplyr::select(LSOA11CD, imd.years, DEPRIVATION),
+                   by = c('LSOA11CD', 'imd.years')) %>% 
+  dplyr::mutate(DEPRIVATION_LABEL = DEPRIVATION %>% factor(., labels = c('1 (Most)', 2:9, '10 (Least)'))) %>% 
+  # to filter out london
+  dplyr::left_join(., lookup.11.21 %>% dplyr::select(LSOA11CD, LAD22CD), 
+                   by = 'LSOA11CD', relationship = 'many-to-many') %>% 
+  dplyr::left_join(., poly.lsoa.england, by = 'LSOA11CD') %>% 
+  sf::st_as_sf()
 
-deprivationPlot_london <-
-  ggplot2::ggplot() +
-  ggplot2::geom_sf(data = 
-                     deprivationPlotData %>% 
-                     dplyr::filter(str_detect(LAD21CD, "^E09")), 
-                   aes(fill = imd10_v2),
-                   colour = NA) +
-  ggplot2::scale_fill_viridis_d(name = 'Deprivation', direction = 1, option = 'G', na.value = 'red') +
-  my.map.theme(legend.position = 'none'); 
-# deprivationPlot_london
+imd.years.vector <- c('Deprivation 2004', 'Deprivation 2007', 'Deprivation 2010', 'Deprivation 2015', 'Deprivation 2019')
 
-deprivationPlot <- 
-  ggplot2::ggplot() +
-  ggplot2::geom_sf(data = countryPoly_England_simple, fill = 'white') +
-  ggplot2::geom_sf(data = deprivationPlotData, aes(fill = imd10_v2), colour = NA) +
-  ggplot2::scale_fill_viridis_d(name = 'Deprivation', direction = 1, option = 'G', na.value = 'red') +
-  # add london in seperately
-  ggplot2::geom_rect(aes(xmin = 490000, xmax = 560000, ymin = 150000, ymax = 210000), color = 'red', linewidth = 1, fill = NA) +
-  ggplot2::annotation_custom(ggplot2::ggplotGrob(deprivationPlot_london), xmin = 82700, xmax = 300000, ymin = 160000, ymax = 450000) +
-  my.map.theme(text = element_text(size = textSize),
-               legend.position = 'bottom')
-# deprivationPlot
+for(i in 1:length(imd.years.vector)){
+  
+  # i <- 1
+  
+  year <- c('04', '07', '10', '15', '19')
+  
+  deprivationPlotData.temp <-
+    deprivationPlotData %>% 
+    dplyr::filter(imd.years == imd.years.vector[i])
+  
+  deprivationPlot_london <-
+    ggplot2::ggplot() +
+    ggplot2::geom_sf(data = 
+                       deprivationPlotData.temp %>% 
+                       dplyr::filter(str_detect(LAD22CD, "^E09")), 
+                     aes(fill = DEPRIVATION_LABEL),
+                     colour = NA) +
+    ggplot2::scale_fill_viridis_d(name = 'Deprivation', direction = 1, option = 'G', na.value = 'red') +
+    my.map.theme(legend.position = 'none'); 
+  # deprivationPlot_london
+  
+  deprivationPlot <- 
+    ggplot2::ggplot() +
+    ggplot2::geom_sf(data = poly.nat.england, fill = 'white') +
+    ggplot2::geom_sf(data = deprivationPlotData.temp, aes(fill = DEPRIVATION_LABEL), colour = NA) +
+    ggplot2::scale_fill_viridis_d(name = 'Deprivation', direction = 1, option = 'G', na.value = 'red') +
+    # add london in seperately
+    ggplot2::geom_rect(aes(xmin = 490000, xmax = 560000, ymin = 150000, ymax = 210000), color = 'red', linewidth = 1, fill = NA) +
+    ggplot2::annotation_custom(ggplot2::ggplotGrob(deprivationPlot_london), xmin = 82700, xmax = 300000, ymin = 160000, ymax = 450000) +
+    ggplot2::facet_grid(~ imd.years) +
+    my.map.theme(text = element_text(size = textSize),
+                 legend.position = 'bottom')
+  # deprivationPlot
+  
+  ggplot2::ggsave(deprivationPlot,
+                  filename = paste0('deprivationPlot_', i, '.png'),
+                  width = width, height = height)
+  
+  
+}
 
-ggplot2::ggsave(deprivationPlot,
-                filename = paste0(resDir_dataExploration, '/deprivationPlot.png'),
-                width = width, height = height)
+### diversity ----
 
+diversityPlotData <-
+  expand.grid(LSOA11CD = poly.lsoa.england$LSOA11CD,
+              ed.years = c('Diversity 2001', 'Diversity 2011', 'Diversity 2021')) %>% 
+  dplyr::left_join(.,
+                   ed.02.21.sorted %>% 
+                     dplyr::filter(YEAR %in% c(2002, 2011, 2021)) %>% 
+                     dplyr::mutate(YEAR = dplyr::if_else(YEAR == 2002, 2001, YEAR)) %>% 
+                     dplyr::mutate(ed.years = paste0('Diversity ', YEAR)) %>% 
+                     dplyr::select(LSOA11CD, ed.years, DIVERSITY),
+                   by = c('LSOA11CD', 'ed.years')) %>% 
+  dplyr::mutate(DIVERSITY_LABEL = DIVERSITY %>% factor(., labels = c('1 (Most)', 2:3, '4 (Least)'))) %>%  
+  # to filter out london
+  dplyr::left_join(., lookup.11.21 %>% dplyr::select(LSOA11CD, LAD22CD), 
+                   by = 'LSOA11CD', relationship = 'many-to-many') %>% 
+  dplyr::left_join(., poly.lsoa.england, by = 'LSOA11CD') %>% 
+  sf::st_as_sf()
 
-### bame ----
+ed.years.vector <- c('Diversity 2001', 'Diversity 2011', 'Diversity 2021')
 
-bamePlotData <-
-  diversityData %>%
-  dplyr::mutate(bame5_v2 = bame5 %>% factor(., labels = c('1 (Most)', 2:4, '5 (Least)')))
-
-bamePlot_london <- 
-  ggplot2::ggplot() +
-  ggplot2::geom_sf(data = 
-                     bamePlotData %>% 
-                     dplyr::filter(str_detect(LAD21CD, "^E09")), 
-                   aes(fill = bame5_v2),
-                   colour = NA) +
-  ggplot2::scale_fill_viridis_d(name = 'Ethnic Mix', direction = 1, option = 'G', na.value = 'red') +
-  my.map.theme(legend.position = 'none'); 
-# bamePlot_london
-
-bamePlot <- 
-  ggplot2::ggplot() +
-  ggplot2::geom_sf(data = countryPoly_England_simple, fill = 'white') +
-  ggplot2::geom_sf(data = bamePlotData, aes(fill = bame5_v2), colour = NA) +
-  ggplot2::scale_fill_viridis_d(name = 'Ethnic Mix', direction = 1, option = 'G', na.value = 'red') +
-  # add london in seperately
-  ggplot2::geom_rect(aes(xmin = 490000, xmax = 560000, ymin = 150000, ymax = 210000), color = 'red', linewidth = 1, fill = NA) +
-  ggplot2::annotation_custom(ggplot2::ggplotGrob(bamePlot_london), xmin = 82700, xmax = 300000, ymin = 160000, ymax = 450000) +
-  my.map.theme(text = element_text(size = textSize),
-               legend.position = 'bottom'); 
-# bamePlot
-
-ggplot2::ggsave(bamePlot,
-                filename = paste0(resDir_dataExploration, '/bamePlot.png'),
-                width = width, height = height)
+for(i in 1:length(ed.years.vector)){
+  
+  # i <- 1
+  
+  year <- c('01', '11', '21')
+  
+  diversityPlotData.temp <-
+    diversityPlotData %>% 
+    dplyr::filter(ed.years == ed.years.vector[i])
+  
+  diversityPlot_london <-
+    ggplot2::ggplot() +
+    ggplot2::geom_sf(data = 
+                       diversityPlotData.temp %>% 
+                       dplyr::filter(str_detect(LAD22CD, "^E09")), 
+                     aes(fill = DIVERSITY_LABEL),
+                     colour = NA) +
+    ggplot2::scale_fill_viridis_d(name = 'Deprivation', direction = 1, option = 'G', na.value = 'red') +
+    my.map.theme(legend.position = 'none'); 
+  # diversityPlot_london
+  
+  diversityPlot <- 
+    ggplot2::ggplot() +
+    ggplot2::geom_sf(data = poly.nat.england, fill = 'white') +
+    ggplot2::geom_sf(data = diversityPlotData.temp, aes(fill = DIVERSITY_LABEL), colour = NA) +
+    ggplot2::scale_fill_viridis_d(name = 'Deprivation', direction = 1, option = 'G', na.value = 'red') +
+    # add london in seperately
+    ggplot2::geom_rect(aes(xmin = 490000, xmax = 560000, ymin = 150000, ymax = 210000), color = 'red', linewidth = 1, fill = NA) +
+    ggplot2::annotation_custom(ggplot2::ggplotGrob(diversityPlot_london), xmin = 82700, xmax = 300000, ymin = 160000, ymax = 450000) +
+    ggplot2::facet_grid(~ ed.years) +
+    my.map.theme(text = element_text(size = textSize),
+                 legend.position = 'bottom')
+  # diversityPlot
+  
+  ggplot2::ggsave(diversityPlot,
+                  filename = paste0('diversityPlot_', i, '.png'),
+                  width = width, height = height)
+  
+  
+}
 
 ## temporal plots ----
 
@@ -312,7 +338,7 @@ employmentPrevalencePlotData <-
   ## filtering
   dplyr::mutate(country = country %>% haven::as_factor()) %>% 
   dplyr::filter(country == 'England', age %in% 16:64, jobStatus %in% c(1:13,97), edu %in% c(1:16,96),
-                ethn %in% c(1:17,96), marStat %in% 1:10, sex %in% 1:2, ghq %in% 0:12, !is.na(localAuthority), !is.na(interviewDate)) %>% 
+                ethn %in% c(1:17,96), marStat %in% 1:10, sex %in% 1:2, ghq %in% 0:12, !is.na(LAD22NM), !is.na(interviewDate)) %>% 
   # formatting
   ## grouping
   dplyr::mutate(# observation
@@ -350,7 +376,7 @@ employmentPrevalencePlot <-
            text = element_text(size = textSize)) 
 employmentPrevalencePlot
 
-ggplot2::ggsave(filename = paste0(resDir_dataExploration, '/employmentPrevalencePlot.png'),
+ggplot2::ggsave(filename = 'employmentPrevalencePlot.png',
                 plot = employmentPrevalencePlot,
                 height = height, width = width)
 
@@ -362,7 +388,7 @@ ethnicityPrevalencePlotData <-
   ## filtering
   dplyr::mutate(country = country %>% haven::as_factor()) %>% 
   dplyr::filter(country == 'England', age %in% 16:64, jobStatus %in% c(1:7,9:13,97), edu %in% c(1:16,96),
-                ethn %in% c(1:17,96), marStat %in% 1:10, sex %in% 1:2, ghq %in% 0:12, !is.na(localAuthority), !is.na(interviewDate)) %>% 
+                ethn %in% c(1:17,96), marStat %in% 1:10, sex %in% 1:2, ghq %in% 0:12, !is.na(LAD22NM), !is.na(interviewDate)) %>% 
   # formatting
   ## grouping
   dplyr::mutate(# observation
@@ -401,6 +427,6 @@ ethnicityPrevalencePlot <-
            text = element_text(size = textSize))
 ethnicityPrevalencePlot
 
-ggplot2::ggsave(filename = paste0(resDir_dataExploration, '/ethnicityPrevalencePlot.png'),
+ggplot2::ggsave(filename = 'ethnicityPrevalencePlot.png',
                 plot = ethnicityPrevalencePlot,
                 height = height, width = width)

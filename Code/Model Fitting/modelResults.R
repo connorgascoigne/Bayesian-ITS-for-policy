@@ -7,90 +7,77 @@ library(INLA)
 # directories ----
 
 # extract file location of this script
-codePath <- rstudioapi::getActiveDocumentContext()$path
-codePathSplitted <- strsplit(codePath, "/")[[1]]
+code.path <- rstudioapi::getActiveDocumentContext()$path
+code.path.splitted <- strsplit(code.path, '/')[[1]]
 
 # retrieve directories
-homeDir <- paste(codePathSplitted[1: (length(codePathSplitted)-3)], collapse = "/")
-codeDir <- paste0(homeDir, '/Code')
-dataDir <- paste0(homeDir, '/Data')
-resDir <- paste0(homeDir, '/Results')
-resDir_modelFit <- paste0(resDir, '/Model Fit')
-resDir_figures <- paste0(resDir, '/Figures')
-
-# results folder
-if(!dir.exists(paths = resDir)) {
-  dir.create(path = resDir)
-}
-
-# model fit folder
-if(!dir.exists(paths = resDir_figures)) {
-  dir.create(path = resDir_figures)
-}
+home.dir <- paste(code.path.splitted[1: (length(code.path.splitted)-3)], collapse = '/')
+code.dir <- paste0(home.dir, '/Code')
+data.dir <- paste0(home.dir, '/Data')
+res.dir <- paste0(home.dir, '/Results')
+data.spatial.dir <- paste0(data.dir, '/shapeFiles')
+res.model.fit.dir <- paste0(res.dir, '/Model Fit')
+res.figures.dir <- paste0(res.dir, '/Figures')
 
 # saving ----
 
 height <- width <- 10
-textSize <- 20
-saveImage <- TRUE
+text.size <- 20
+save.image <- TRUE
 
 # import ----
 
 ## functions ----
 
-source(paste0(codeDir, '/functions.R'))
+source(paste0(code.dir, '/functions.R'))
 
 ## spatial ----
 
 ### raw ----
 
-onsShapePath <- 'Data/shapeFiles_ons2/'
-ltlaPoly <- sf::st_read(paste0(onsShapePath, 'ons21_GBR_LTLA_shp/ons21_GBR_LTLA.shp'))
-countryPoly <- sf::st_read(paste0(onsShapePath, 'ons21_GBR_country_shp/ons21_GBR_country.shp'))
+# spatial polygons at lsoa and lad levels
+poly.lad <- sf::st_read(dsn = data.spatial.dir, layer = 'ONS22_LAD')
+poly.nat <- sf::st_read(dsn = data.spatial.dir, layer = 'ONS21_NAT')
 
 ### organised ----
 
-ltlaPoly_England <-
-  ltlaPoly %>%
-  dplyr::filter(str_detect(LAD21CD, "^E"))
-countryPoly_England <-
-  countryPoly %>%
-  dplyr::filter(str_detect(CTRY21CD, "^E"))
+poly.lad.england <- poly.lad %>%  dplyr::filter(str_detect(LAD22CD, '^E'))
+poly.nat.england <- poly.nat %>%  dplyr::filter(str_detect(CTRY21CD, '^E'))
 
 spatialPlotSimple <- FALSE
 if(spatialPlotSimple){
   # less detailed but quicker plots
-  ltlaPoly_England_simple <-
-    ltlaPoly_England %>%
+  poly.lad.england <-
+    poly.lad.england %>%
     sf::st_simplify(., preserveTopology = TRUE, dTolerance = 1000)
-  countryPoly_England_simple <-
-    countryPoly_England %>%
+  poly.nat.england <-
+    poly.nat.england %>%
     sf::st_simplify(., preserveTopology = TRUE, dTolerance = 1000)
-} else{
-  # full detail for FINAL plots
-  ltlaPoly_England_simple <-
-    ltlaPoly_England
-  countryPoly_England_simple <-
-    countryPoly_England
 }
 
 ## results ----
 
-dataFinal <- readRDS(file = paste0(resDir_modelFit, '/modelData.rds'))
-fit <- readRDS(file = paste0(resDir_modelFit, '/modelFit.rds'))
-theta.predictor <- readRDS(file = paste0(resDir_modelFit, '/linearPredictorSamples.rds'))
-theta.observation <- readRDS(file = paste0(resDir_modelFit, '/observationSamples.rds'))
-theta.space <- readRDS(file = paste0(resDir_modelFit, '/spatialRandomEffectSamples.rds'))
-theta.time <- readRDS(file = paste0(resDir_modelFit, '/temporalRandomEffectSamples.rds'))
+setwd(res.model.fit.dir)
+data.final <- readRDS(file = 'modelData.rds')
+fit <- readRDS(file = 'modelFit.rds')
+theta.predictor <- readRDS(file = 'linearPredictorSamples.rds')
+theta.observation <- readRDS(file = 'observationSamples.rds')
+theta.parameter <- readRDS(file = 'parameterSamples.rds')
+theta.space <- readRDS(file = 'spatialRandomEffectSamples.rds')
+theta.time <- readRDS(file = 'temporalRandomEffectSamples.rds')
 
 # plots ----
+
+setwd(res.figures.dir)
 
 ## centered years ----
 
 centeredPlotData.national <-
-  theta.predictor %>% 
-  dplyr::mutate(time = time %>% factor(., labels = c(-10:-1, 'Start', 1:5))) %>%
-  dplyr::filter(time != 5) %>%
+  theta.predictor %>%
+  dplyr::mutate(time =
+                  (lubridate::interval(start = ucStartDate, end = interviewDate) %/% months(12)) %>%
+                  factor(.,
+                         labels = c(-10:-1, 'Start', 1:4))) %>%
   dplyr::summarise(dplyr::across(dplyr::starts_with('theta:'), mean),
                    .by = c('exposed', 'time')) %>%
   dplyr::mutate(dplyr::select(., starts_with('theta:')) %>% 
@@ -106,17 +93,17 @@ centeredPlot.national <-
   ggplot2::geom_point() +
   ggplot2::geom_line() +
   ggplot2::geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.25, colour = NA) +
-  ggplot2::scale_colour_manual(values = c('red3', 'blue3')) +
-  ggplot2::scale_fill_manual(values = c('red3', 'blue3')) +
-  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ggplot2::scale_colour_manual(values = c('blue3', 'red3')) +
+  ggplot2::scale_fill_manual(values = c('blue3', 'red3')) +
+  ggplot2::scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
   ggplot2::labs(x = 'Time since awareness to Universal Credit (years)', y = 'Psychological distress prevalence (%)') +
   my.theme(legend.title = element_blank(),
            legend.position = 'bottom',
-           text = element_text(size = textSize))
+           text = element_text(size = text.size))
 centeredPlot.national
 
-if(saveImage){
-  ggplot2::ggsave(filename = paste0(resDir_figures, '/centeredPlot.national.png'),
+if(save.image){
+  ggplot2::ggsave(filename = 'centeredPlot.national.png',
                   plot = centeredPlot.national,
                   height = height, width = width)
 }
@@ -128,14 +115,14 @@ if(saveImage){
 standChangePlotData.national <- 
   theta.predictor %>%
   dplyr::summarise(dplyr::across(dplyr::starts_with('theta:'), mean),
-                   .by = c('exposed', 'treatment', 'country')) %>%
+                   .by = c('exposed', 'treatment')) %>%
   dplyr::mutate(grouping = interaction(exposed, treatment, sep = '')) %>%
   tidyr::pivot_longer(cols = dplyr::starts_with('theta:'), names_to = 'theta', names_prefix = 'theta:', values_to = 'value') %>%
   dplyr::summarise(summary = 
                      (expit(value[grouping == 'Exposed1']) - 
                         expit(value[grouping == 'Exposed0'] * (value[grouping == 'Control1']/value[grouping == 'Control0']))) /
                      (expit(value[grouping == 'Exposed0'] * (value[grouping == 'Control1']/value[grouping == 'Control0']))) * 100,
-                   .by = c('theta', 'country')) %>%
+                   .by = c('theta')) %>%
   tidyr::pivot_wider(names_from = 'theta', values_from = 'summary', names_prefix = 'theta:', names_sep = '') %>%
   dplyr::mutate(dplyr::select(., starts_with('theta:')) %>%
                   apply(., 1, my.summary) %>% 
@@ -143,89 +130,88 @@ standChangePlotData.national <-
                   do.call(rbind, .)) %>%
   dplyr::select(-starts_with('theta:'))
 
-standChangePlotData.localAuthority <-
+standChangePlotData.lad <-
   theta.predictor %>%
   dplyr::summarise(dplyr::across(dplyr::starts_with('theta:'), mean),
-                   .by = c('exposed', 'treatment', 'localAuthority')) %>%
+                   .by = c('exposed', 'treatment', 'LAD22NM')) %>%
   dplyr::mutate(grouping = interaction(exposed, treatment, sep = '')) %>%
   tidyr::pivot_longer(cols = dplyr::starts_with('theta:'), names_to = 'theta', names_prefix = 'theta:', values_to = 'value') %>%
   dplyr::summarise(summary = 
                      (expit(value[grouping == 'Exposed1']) - 
                         expit(value[grouping == 'Exposed0'] * (value[grouping == 'Control1']/value[grouping == 'Control0']))) /
                      (expit(value[grouping == 'Exposed0'] * (value[grouping == 'Control1']/value[grouping == 'Control0']))) * 100,
-                   .by = c('localAuthority', 'theta')) %>%
+                   .by = c('LAD22NM', 'theta')) %>%
   tidyr::pivot_wider(names_from = 'theta', values_from = 'summary', names_prefix = 'theta:', names_sep = '') %>%
   dplyr::mutate(dplyr::select(., starts_with('theta:')) %>%
                   apply(., 1, my.summary) %>% 
                   lapply(., data.frame) %>%
                   do.call(rbind, .)) %>%
   dplyr::select(-starts_with('theta:')) %>%
-  dplyr::left_join(., ltlaPoly_England_simple, by = c('localAuthority' = 'LAD21NM')) %>%
+  dplyr::left_join(., poly.lad.england, by = 'LAD22NM') %>%
   dplyr::arrange(median) %>%
-  dplyr::mutate(localAuthority = localAuthority %>% haven::as_factor(),
-                localAuthority_id = localAuthority %>% as.numeric()) %>%
+  dplyr::mutate(space = LAD22NM %>% haven::as_factor(),
+                space_id = space %>% as.numeric()) %>%
   sf::st_as_sf()
 
-largestStandChange.localAuthority <-
-  standChangePlotData.localAuthority %>% 
+largestStandChange.lad <-
+  standChangePlotData.lad %>% 
   dplyr::filter(median == max(median)) %>% 
-  dplyr::mutate(label = paste0('Increase:\n', localAuthority)) 
+  dplyr::mutate(label = paste0('Increase:\n', LAD22NM)) 
 
-smallestStandChange.localAuthority <- 
-  standChangePlotData.localAuthority %>% 
+smallestStandChange.lad <- 
+  standChangePlotData.lad %>% 
   dplyr::filter(median == min(median)) %>% 
-  dplyr::mutate(label = paste0('Decrease:\n', localAuthority))
+  dplyr::mutate(label = paste0('Decrease:\n', LAD22NM))
 
-standChangePlot.localAuthority_prev <- 
+standChangePlot.lad_prev <- 
   ggplot2::ggplot() +
   # England outline filled in with white - must be first
-  ggplot2::geom_sf(data = countryPoly_England_simple, fill = 'white') +
+  ggplot2::geom_sf(data = poly.nat.england, fill = 'white') +
   # estimate and CI width
-  ggplot2::geom_sf(data = standChangePlotData.localAuthority, aes(fill = median), colour = 'black') +
+  ggplot2::geom_sf(data = standChangePlotData.lad, aes(fill = median), colour = 'black') +
   # largest and smallest StandChange
   ## largest 
-  ggrepel::geom_text_repel(data = largestStandChange.localAuthority,
+  ggrepel::geom_text_repel(data = largestStandChange.lad,
                            aes(label = label, geometry = geometry),
                            stat = 'sf_coordinates',
                            size = 8,
-                           nudge_x = 210000 - largestStandChange.localAuthority$BNG_E,
-                           nudge_y = 450000 - largestStandChange.localAuthority$BNG_N,
+                           nudge_x = 210000 - largestStandChange.lad$BNG_E,
+                           nudge_y = 450000 - largestStandChange.lad$BNG_N,
                            min.segment.length = 0) +
   ## smallest 
-  ggrepel::geom_text_repel(data = smallestStandChange.localAuthority,
+  ggrepel::geom_text_repel(data = smallestStandChange.lad,
                            aes(label = label, geometry = geometry),
                            stat = 'sf_coordinates', 
                            size = 8,
-                           nudge_x = 210000 - smallestStandChange.localAuthority$BNG_E,
-                           nudge_y = 210000 - smallestStandChange.localAuthority$BNG_N,
+                           nudge_x = 210000 - smallestStandChange.lad$BNG_E,
+                           nudge_y = 210000 - smallestStandChange.lad$BNG_N,
                            min.segment.length = 0) +
   # set colour
   ggplot2::scale_fill_gradient2(name = 'Standardised \nchange (%)',
                                 low = 'blue3', mid = 'grey', high = 'red3',
                                 midpoint = 0, n.breaks = 4) +
-  my.map.theme(text = element_text(size = textSize),
+  my.map.theme(text = element_text(size = text.size),
                legend.position = 'bottom')
-if(spatialPlotSimple){standChangePlot.localAuthority_prev}
+if(spatialPlotSimple){standChangePlot.lad_prev}
 
-
-standChangePlot.localAuthority_uncer <-
-  ggplot2::ggplot(data = standChangePlotData.localAuthority, 
-                  aes(x = localAuthority, y = median, color = localAuthority_id)) +
+standChangePlot.lad_uncer <-
+  ggplot2::ggplot(data = standChangePlotData.lad, 
+                  aes(x = space_id, y = median, color = space_id)) +
   ggplot2::geom_point() +
   ggplot2::geom_errorbar(aes(ymin = lower, ymax = upper), width = .05) +
   ggplot2::scale_colour_gradient2(low = 'blue3',
                                   mid = 'grey',
                                   high = 'red3',
-                                  midpoint = which.max(standChangePlotData.localAuthority$median > 0)) + 
+                                  midpoint = which.max(standChangePlotData.lad$median > 0)) + 
   ggplot2::geom_hline(yintercept = 0, color = 'black', linetype = 'dashed') +
   ggplot2::labs(x = 'Lower Tier Local Authority', y = 'Standardised change (%)') +
   # largest and smallest StandChange
   ## largest 
-  ggrepel::geom_label_repel(data = largestStandChange.localAuthority,
+  ggrepel::geom_label_repel(data = largestStandChange.lad,
                             aes(label = label), colour = 'black',
                             nudge_x = -30, nudge_y = 10, size = 8) +
   ## smallest 
-  ggrepel::geom_label_repel(data = smallestStandChange.localAuthority,
+  ggrepel::geom_label_repel(data = smallestStandChange.lad,
                             aes(label = label), colour = 'black',
                             nudge_x = 15, nudge_y = -20, size = 8) +
   # national results
@@ -233,23 +219,22 @@ standChangePlot.localAuthority_uncer <-
   ggplot2::annotate(geom = 'text',
                     label = paste0('National: ', round(standChangePlotData.national$median, 2), 
                                    '% \n(', round(standChangePlotData.national$lower, 2), '% - ', round(standChangePlotData.national$upper, 2), '%)'),
-                    x = nrow(standChangePlotData.localAuthority)/4, 
+                    x = nrow(standChangePlotData.lad)/4, 
                     y = 30,
                     color = 'black',
                     size = 8) +
   my.theme(axis.ticks.x = element_blank(),
            axis.text.x = element_blank(),
            legend.position = 'none',
-           text = element_text(size = textSize))
-standChangePlot.localAuthority_uncer
+           text = element_text(size = text.size))
+standChangePlot.lad_uncer
 
-
-if(saveImage){
-  ggplot2::ggsave(filename = paste0(resDir_figures, '/standChangePlot.localAuthority_prev.png'),
-                  plot = standChangePlot.localAuthority_prev,
+if(save.image){
+  ggplot2::ggsave(filename = 'standChangePlot.lad_prev.png',
+                  plot = standChangePlot.lad_prev,
                   height = height, width = width) 
-  ggplot2::ggsave(filename = paste0(resDir_figures, '/standChangePlot.localAuthority_uncer.png'),
-                  plot = standChangePlot.localAuthority_uncer,
+  ggplot2::ggsave(filename = 'standChangePlot.lad_uncer.png',
+                  plot = standChangePlot.lad_uncer,
                   height = height, width = width) 
 }
 
@@ -258,7 +243,7 @@ if(saveImage){
 
 standChangePlotData.allConfounders <- 
   theta.predictor %>%
-  tidyr::pivot_longer(cols = c('age', 'edu', 'ethn', 'marStat', 'sex', 'imd10', 'bame5'), names_to = 'confounder', values_to = 'category') %>% 
+  tidyr::pivot_longer(cols = c('age', 'edu', 'ethn', 'marStat', 'sex', 'deprivation', 'diversity'), names_to = 'confounder', values_to = 'category') %>% 
   dplyr::summarise(dplyr::across(dplyr::starts_with('theta:'), mean),
                    .by = c('exposed', 'treatment', 'confounder', 'category')) %>% 
   dplyr::mutate(grouping = interaction(exposed, treatment, sep = '')) %>%
@@ -274,10 +259,10 @@ standChangePlotData.allConfounders <-
                   lapply(., data.frame) %>%
                   do.call(rbind, .),
                 confounder = confounder %>% factor(., 
-                                                   levels = c('age', 'edu', 'ethn', 'marStat', 'sex', 'imd10', 'bame5'),
+                                                   levels = c('age', 'edu', 'ethn', 'marStat', 'sex', 'deprivation', 'diversity'),
                                                    labels = c('Age', 'Education', 'Ethnicity', 
                                                               'Marital Status', 'Sex', 
-                                                              'Deprivation', 'Ethnic Mix')), 
+                                                              'Deprivation', 'Diversity')), 
                 category = category %>% factor(.,
                                                levels = c('[16, 25)', '[25, 35)', '[35, 45)', '[45, 55)', '[55, 65)', 
                                                           'Degree or higher', 'GCSE, A-level or equivalent', 'Below GCSE and other',
@@ -302,11 +287,11 @@ standChangePlot.allConfounders <-
   ggplot2::facet_wrap(~confounder, scales = 'free_x', ncol = 2) +
   ggplot2::labs(x = '', y = 'Standardised change (%)') + 
   my.theme(legend.position = 'none',
-           text = element_text(size = textSize)); standChangePlot.allConfounders
+           text = element_text(size = text.size)); standChangePlot.allConfounders
 
 
-if(saveImage){
-  ggplot2::ggsave(filename = paste0(resDir_figures, '/standChangePlot.allConfounders.png'),
+if(save.image){
+  ggplot2::ggsave(filename = 'standChangePlot.allConfounders.png',
                   plot = standChangePlot.allConfounders,
                   height = height, width = 2*width)  
 }
@@ -316,7 +301,7 @@ if(saveImage){
 standChangePlotData.jointConfounders <- 
   theta.predictor %>%
   tidyr::pivot_longer(cols = c('age', 'edu', 'ethn', 'marStat', 'sex'), names_to = 'indConfounder', values_to = 'indCategory') %>% 
-  tidyr::pivot_longer(cols = c('imd10', 'bame5'), names_to = 'comConfounder', values_to = 'comCategory') %>% 
+  tidyr::pivot_longer(cols = c('deprivation', 'diversity'), names_to = 'comConfounder', values_to = 'comCategory') %>% 
   dplyr::mutate(confounder = interaction(indConfounder, comConfounder),
                 category = interaction(indCategory, comCategory)) %>%
   dplyr::summarise(dplyr::across(dplyr::starts_with('theta:'), mean),
@@ -353,8 +338,8 @@ standChangePlotData.jointConfounders <-
                                                                 '[Married or civil partnership]', '[Unmarried]',
                                                                 '[Male]', '[Female]')),
                 comConfounder = comConfounder %>% factor(., 
-                                                         levels = c('imd10', 'bame5'),
-                                                         labels = c('Deprivation', 'Ethnic Mix')),
+                                                         levels = c('deprivation', 'diversity'),
+                                                         labels = c('Deprivation', 'Diversity')),
                 comCategory = comCategory %>% factor(., levels = 1:10,
                                                      labels = c('[1]', '[2]', '[3]', '[4]', '[5]', '[6]', '[7]', '[8]', '[9]', '[10]'))) %>% 
   dplyr::arrange(comConfounder, comCategory, indConfounder, indCategory)
@@ -374,7 +359,7 @@ missingComb <-
                                                                 '[Married or civil partnership]', '[Unmarried]',
                                                                 '[Male]', '[Female]')),
                 comConfounder = comConfounder %>% factor(., 
-                                                         levels = c('Deprivation', 'Ethnic Mix')),
+                                                         levels = c('Deprivation', 'Diversity')),
                 comCategory = comCategory %>% factor(., 
                                                      levels = 1:10,
                                                      labels = c('[1]', '[2]', '[3]', '[4]', '[5]', '[6]', '[7]', '[8]', '[9]', '[10]')))
@@ -391,12 +376,12 @@ standChangePlot.jointConfounders <-
   ggplot2::facet_grid(indConfounder ~ comConfounder, scales = 'free') +
   ggplot2::scale_y_discrete(limits = rev) + 
   ggplot2::labs(x = '', y = '') + 
-  my.theme(text = element_text(size = textSize),
+  my.theme(text = element_text(size = text.size),
            legend.position = 'bottom',
            legend.title.align = 0.5); standChangePlot.jointConfounders
 
-if(saveImage){
-  ggplot2::ggsave(filename = paste0(resDir_figures, '/standChangePlot.jointConfounders.png'),
+if(save.image){
+  ggplot2::ggsave(filename = 'standChangePlot.jointConfounders.png',
                   plot = standChangePlot.jointConfounders,
                   height = height, width = width)
 }
@@ -409,7 +394,6 @@ if(saveImage){
 
 allYear.exposure.temporalProfile <- 
   theta.predictor %>%
-  # dplyr::filter(time %in% -3:3) %>% 
   dplyr::summarise(dplyr::across(dplyr::starts_with('theta:'), mean),
                    .by = c('exposed')) %>%
   dplyr::mutate(dplyr::select(., starts_with('theta:')) %>% 
@@ -441,7 +425,7 @@ beforeAfter.exposure.temporalProfile <-
 
 seperateTimes.exposure.temporalProfile <-
   theta.predictor %>%
-  # dplyr::filter(time %in% -3:3) %>%
+  dplyr::mutate(time = (lubridate::year(interviewDate) - lubridate::year(ucStartDate))) %>%
   dplyr::filter(time != 5) %>%
   dplyr::summarise(dplyr::across(dplyr::starts_with('theta:'), mean),
                    .by = c('exposed', 'time')) %>%
@@ -495,7 +479,7 @@ beforeAfter.versus.temporalProfile <-
 
 seperateTimes.versus.temporalProfile <- 
   theta.predictor %>%
-  # dplyr::filter(time %in% -3:3) %>%
+  dplyr::mutate(time = (lubridate::year(interviewDate) - lubridate::year(ucStartDate))) %>%
   dplyr::filter(time != 5) %>%
   dplyr::summarise(dplyr::across(dplyr::starts_with('theta:'), mean),
                    .by = c('exposed', 'time')) %>%
@@ -529,37 +513,9 @@ temporalProfile <-
         allYear.temporalProfile) %>% 
   dplyr::mutate(across(-c('time', starts_with('diff_')), ~ round(.x*100, digits = 2)))
 
-print(xtable::xtable(temporalProfile), include.rownames = FALSE)
-
-# % latex table generated in R 4.2.1 by xtable 1.8-4 package
-# % Thu Jun 22 10:54:20 2023
-# \begin{table}[ht]
-# \centering
-# \begin{tabular}{lrrrrrrrrr}
-# \hline
-# time & lower\_Exposed & median\_Exposed & upper\_Exposed & lower\_Control & median\_Control & upper\_Control & diff\_lower & diff\_median & diff\_upper \\ 
-# \hline
-# -10 & 29.87 & 30.38 & 30.81 & 17.81 & 18.01 & 18.22 & 1.66 & 1.69 & 1.72 \\
-# -9 & 32.20 & 32.62 & 33.04 & 16.17 & 16.30 & 16.44 & 1.97 & 2.00 & 2.03 \\
-# -8 & 36.14 & 36.53 & 36.92 & 15.89 & 16.00 & 16.12 & 2.26 & 2.28 & 2.31 \\
-# -7 & 38.49 & 38.89 & 39.26 & 15.41 & 15.54 & 15.66 & 2.48 & 2.50 & 2.53 \\
-# -6 & 43.10 & 43.48 & 43.89 & 15.59 & 15.71 & 15.84 & 2.74 & 2.77 & 2.79 \\
-# -5 & 44.79 & 45.22 & 45.67 & 14.82 & 14.95 & 15.09 & 3.00 & 3.02 & 3.06 \\
-# -4 & 43.76 & 44.30 & 44.88 & 14.26 & 14.39 & 14.51 & 3.04 & 3.08 & 3.12 \\
-# -3 & 49.28 & 49.83 & 50.49 & 14.43 & 14.56 & 14.70 & 3.38 & 3.42 & 3.47 \\
-# -2 & 52.77 & 53.37 & 54.05 & 14.77 & 14.91 & 15.06 & 3.53 & 3.58 & 3.64 \\
-# -1 & 58.55 & 59.28 & 60.16 & 15.89 & 16.08 & 16.28 & 3.63 & 3.69 & 3.74 \\
-# 0 & 47.90 & 49.60 & 51.31 & 18.14 & 18.37 & 18.60 & 2.60 & 2.70 & 2.80 \\
-# 1 & 49.98 & 51.17 & 52.36 & 19.00 & 19.18 & 19.39 & 2.60 & 2.67 & 2.73 \\
-# 2 & 42.69 & 44.93 & 46.94 & 17.49 & 17.82 & 18.16 & 2.39 & 2.52 & 2.64 \\
-# 3 & 36.02 & 39.66 & 43.20 & 16.20 & 16.69 & 17.26 & 2.15 & 2.37 & 2.58 \\
-# 4 & 34.73 & 39.69 & 44.36 & 17.42 & 18.47 & 19.62 & 1.86 & 2.14 & 2.42 \\
-# Before & 41.59 & 41.90 & 42.25 & 15.35 & 15.42 & 15.50 & 2.69 & 2.72 & 2.74 \\
-# After & 48.38 & 49.51 & 50.68 & 18.36 & 18.53 & 18.72 & 2.61 & 2.67 & 2.73 \\
-# All & 42.39 & 42.73 & 43.07 & 15.86 & 15.93 & 16.01 & 2.66 & 2.68 & 2.70 \\
-# \hline
-# \end{tabular}
-# \end{table}
+print(x = xtable::xtable(temporalProfile), 
+      include.rownames = FALSE,
+      file = 'temporalProfile.tex')
 
 ## confounder profiles ----
 
@@ -604,40 +560,21 @@ confounderProfile.topBottom5 <-
                                      levels = c('Male', 'Female'),
                                      labels = c('[Male]', '[Female]')))
 
-print(xtable::xtable(confounderProfile.topBottom5), include.rownames = FALSE)
+print(x = xtable::xtable(confounderProfile.topBottom5), 
+      include.rownames = FALSE,
+      file = 'confounderProfileTopBottom5.tex')
 
-# % latex table generated in R 4.2.1 by xtable 1.8-4 package
-# % Thu Jun 22 11:06:49 2023
-# \begin{table}[ht]
-# \centering
-# \begin{tabular}{lllllrrr}
-# \hline
-# age & edu & ethn & marStat & sex & lower & median & upper \\ 
-# \hline
-# [16, 25) & [GCSE, A-level or equivalent] & [Black] & [Unmarried] & [Male] & 51.01 & 55.96 & 60.69 \\
-# [25, 35) & [Degree or higher] & [White] & [Married or civil partnership] & [Female] & 42.13 & 51.22 & 60.13 \\
-# [25, 35) & [Below GCSE and other] & [Black] & [Unmarried] & [Female] & 42.67 & 47.00 & 50.73 \\
-# [45, 55) & [GCSE, A-level or equivalent] & [Black] & [Married or civil partnership] & [Male] & 39.95 & 46.25 & 52.25 \\
-# [25, 35) & [Below GCSE and other] & [Other] & [Unmarried] & [Male] & 38.14 & 45.51 & 54.62 \\
-# [55, 65) & [Degree or higher] & [Mixed] & [Married or civil partnership] & [Male] & -31.82 & -22.19 & -13.34 \\
-# [45, 55) & [GCSE, A-level or equivalent] & [Asian] & [Married or civil partnership] & [Male] & -26.15 & -22.91 & -19.73 \\
-# [55, 65) & [Below GCSE and other] & [Black] & [Unmarried] & [Male] & -27.97 & -23.78 & -20.05 \\
-# [45, 55) & [Degree or higher] & [White] & [Married or civil partnership] & [Female] & -26.70 & -24.29 & -22.09 \\
-# [35, 45) & [Below GCSE and other] & [Black] & [Married or civil partnership] & [Male] & -32.46 & -25.45 & -17.21 \\
-# \hline
-# \end{tabular}
-# \end{table}
 
 # additional results ----
+
 ## sample characteristics ----
 
 percentInd <-
   data.frame(id = 'id',
-             n = nrow(dataFinal),
-             Freq = dataFinal$individual %>% unique() %>% length()); percentInd
+             Freq = data.final$individual %>% unique() %>% length()); percentInd
 
 percentEmployed <-
-  dataFinal %>% 
+  data.final %>% 
   dplyr::select(individual, exposed) %>% 
   dplyr::distinct() %>% 
   dplyr::select(-individual) %>% 
@@ -647,7 +584,7 @@ percentEmployed <-
   dplyr::arrange(exposed); percentEmployed
 
 percentAge <-
-  dataFinal %>% 
+  data.final %>% 
   dplyr::select(individual, age) %>% 
   dplyr::distinct() %>% 
   dplyr::select(-individual) %>% 
@@ -657,7 +594,7 @@ percentAge <-
   dplyr::arrange(age); percentAge
 
 percentEdu <-
-  dataFinal %>% 
+  data.final %>% 
   dplyr::select(individual, edu) %>% 
   dplyr::distinct() %>% 
   dplyr::select(-individual) %>% 
@@ -667,7 +604,7 @@ percentEdu <-
   dplyr::arrange(edu); percentEdu
 
 percentEthn <-
-  dataFinal %>% 
+  data.final %>% 
   dplyr::select(individual, ethn) %>% 
   dplyr::distinct() %>% 
   dplyr::select(-individual) %>% 
@@ -678,7 +615,7 @@ percentEthn <-
 
 
 percentMarStat <-
-  dataFinal %>% 
+  data.final %>% 
   dplyr::select(individual, marStat) %>% 
   dplyr::distinct() %>% 
   dplyr::select(-individual) %>% 
@@ -689,7 +626,7 @@ percentMarStat <-
 
 
 percentSex <-
-  dataFinal %>% 
+  data.final %>% 
   dplyr::select(individual, sex) %>% 
   dplyr::distinct() %>% 
   dplyr::select(-individual) %>% 
@@ -699,24 +636,24 @@ percentSex <-
   dplyr::arrange(sex); percentSex
 
 percentDep <-
-  dataFinal %>% 
-  dplyr::select(individual, imd10) %>% 
+  data.final %>% 
+  dplyr::select(individual, DEPRIVATION) %>% 
   dplyr::distinct() %>% 
   dplyr::select(-individual) %>% 
-  dplyr::summarise(n = n(), .by = 'imd10') %>% 
+  dplyr::summarise(n = n(), .by = 'DEPRIVATION') %>% 
   dplyr::mutate(freq = round(n/sum(n) * 100, digits = 2),
-                imd10 = imd10 %>% factor(., levels = 1:10)) %>% 
-  dplyr::arrange(imd10); percentDep
+                deprivation = DEPRIVATION %>% factor(., levels = 1:10)) %>% 
+  dplyr::arrange(deprivation); percentDep
 
 percentDiv <-
-  dataFinal %>% 
-  dplyr::select(individual, bame5) %>% 
+  data.final %>% 
+  dplyr::select(individual, DIVERSITY) %>% 
   dplyr::distinct() %>% 
   dplyr::select(-individual) %>% 
-  dplyr::summarise(n = n(), .by = 'bame5') %>% 
+  dplyr::summarise(n = n(), .by = 'DIVERSITY') %>% 
   dplyr::mutate(freq = round(n/sum(n) * 100, digits = 2),
-                bame5 = bame5 %>% factor(., levels = 1:5)) %>% 
-  dplyr::arrange(bame5); percentDiv
+                diversity = DIVERSITY %>% factor(., levels = 1:6)) %>% 
+  dplyr::arrange(diversity); percentDiv
 
 ## model parameters ----
 
@@ -733,86 +670,42 @@ fitSummary <-
         rep('Relative to [Married or civil partnership]', times = 1),
         rep('Relative to [Male]', times = 1),
         rep('Deprivation relative to [1]', times = 9),
-        rep('Ethnic mix relative to [1]', times = 4),
-        rep('Random effect', times = 2)),
+        rep('Diversity relative to [1]', times = 3),
+        rep('Random effect', times = 3)),
     parameter = 
-      c('Intercept', 'Year', 'Intervention', 'Year+',
-        'Intercept', 'Year', 'Intervention', 'Year+',
+      c('Intercept', 'Time', 'Intervention', 'Time+',
+        'Intercept', 'Time', 'Intervention', 'Time+',
         '[25, 35)', '[35, 45)', '[45, 55)', '[55, 65)',
         '[Below GCSE and other]', '[GCSE, A-level or equivalent]',
         '[Asian]', '[Black]', '[Mixed]', '[Other]',
         '[Unmarried]',
         '[Female]',
         '[2]', '[3]', '[4]', '[5]', '[6]', '[7]', '[8]', '[9]', '[10]',
-        '[2]', '[3]', '[4]', '[5]',
-        'Temporal precision', 'Spatial precision'),
-    lower = c(fit$summary.fixed[,3] %>% round(., digits = 2), fit$summary.hyperpar[,3] %>% round(., digits = 2)),
-    median = c(fit$summary.fixed[,4] %>% round(., digits = 2), fit$summary.hyperpar[,4] %>% round(., digits = 2)),
-    upper = c(fit$summary.fixed[,5] %>% round(., digits = 2), fit$summary.hyperpar[,5] %>% round(., digits = 2)))
+        '[2]', '[3]', '[4]',
+        'Temporal precision', 'Spatial precision', 'Spatial mixing'),
+    lower = c(fit$summary.fixed[,3], fit$summary.hyperpar[,3]),
+    median = c(fit$summary.fixed[,4], fit$summary.hyperpar[,4]),
+    upper = c(fit$summary.fixed[,5], fit$summary.hyperpar[,5]))
 
-print(xtable::xtable(fitSummary), include.rownames = FALSE)
-
-# % latex table generated in R 4.2.1 by xtable 1.8-4 package
-# % Thu Jun 22 09:52:14 2023
-# \begin{table}[ht]
-# \centering
-# \begin{tabular}{llrrr}
-# \hline
-# group & parameter & lower & median & upper \\ 
-# \hline
-# Control ITS terms & Intercept & -1.08 & -0.84 & -0.58 \\ 
-# Control ITS terms & Year & -0.01 & 0.02 & 0.05 \\ 
-# Control ITS terms & Intervention & 0.17 & 0.20 & 0.24 \\ 
-# Control ITS terms & Year+ & -0.19 & -0.17 & -0.15 \\ 
-# Exposed ITS terms & Intercept & -0.70 & -0.67 & -0.64 \\ 
-# Exposed ITS terms & Year & 0.11 & 0.12 & 0.12 \\ 
-# Exposed ITS terms & Intervention & -0.54 & -0.41 & -0.28 \\ 
-# Exposed ITS terms & Year+ & -0.27 & -0.21 & -0.14 \\ 
-# Relative to [16, 25) & [25, 35) & 0.04 & 0.06 & 0.08 \\ 
-# Relative to [16, 25) & [35, 45) & 0.13 & 0.15 & 0.16 \\ 
-# Relative to [16, 25) & [45, 55) & 0.23 & 0.24 & 0.26 \\ 
-# Relative to [16, 25) & [55, 65) & -0.04 & -0.03 & -0.01 \\ 
-# Relative to [Degree or higher] & [Below GCSE and other] & -0.04 & -0.03 & -0.02 \\ 
-# Relative to [Degree or higher] & [GCSE, A-level or equivalent] & 0.07 & 0.08 & 0.09 \\ 
-# Relative to [White] & [Asian] & 0.12 & 0.14 & 0.17 \\ 
-# Relative to [White] & [Black] & 0.10 & 0.12 & 0.15 \\ 
-# Relative to [White] & [Mixed] & -0.19 & -0.16 & -0.12 \\ 
-# Relative to [White] & [Other] & 0.29 & 0.37 & 0.45 \\ 
-# Relative to [Married or civil partnership] & [Unmarried] & 0.29 & 0.30 & 0.31 \\ 
-# Relative to [Male] & [Female] & 0.49 & 0.50 & 0.51 \\ 
-# Deprivation relative to [1] & [2] & -0.17 & -0.15 & -0.12 \\ 
-# Deprivation relative to [1] & [3] & -0.06 & -0.04 & -0.02 \\ 
-# Deprivation relative to [1] & [4] & -0.23 & -0.21 & -0.19 \\ 
-# Deprivation relative to [1] & [5] & -0.27 & -0.25 & -0.22 \\ 
-# Deprivation relative to [1] & [6] & -0.17 & -0.15 & -0.12 \\ 
-# Deprivation relative to [1] & [7] & -0.34 & -0.31 & -0.29 \\ 
-# Deprivation relative to [1] & [8] & -0.43 & -0.41 & -0.39 \\ 
-# Deprivation relative to [1] & [9] & -0.39 & -0.36 & -0.34 \\ 
-# Deprivation relative to [1] & [10] & -0.35 & -0.33 & -0.30 \\ 
-# Ethnic mix relative to [1] & [2] & 0.03 & 0.08 & 0.12 \\ 
-# Ethnic mix relative to [1] & [3] & 0.03 & 0.08 & 0.12 \\ 
-# Ethnic mix relative to [1] & [4] & 0.15 & 0.20 & 0.24 \\ 
-# Ethnic mix relative to [1] & [5] & 0.06 & 0.11 & 0.15 \\ 
-# Random effect & Temporal precision & 9.62 & 23.40 & 51.64 \\ 
-# Random effect & Spatial precision & 6.67 & 7.88 & 9.25 \\ 
-# \hline
-# \end{tabular}
-# \end{table}
+print(x = xtable::xtable(fitSummary,
+                         digits = 4), 
+      include.rownames = FALSE,
+      file = 'fitSummary.tex')
 
 ### plot ----
 
 fitSummaryPlotData <- 
   data.frame(parameter = 
-               c('Intercept', 'Year', 'Intervention', 'Year+',
-                 'Intercept', 'Year', 'Intervention', 'Year+',
+               c('Intercept', 'Time', 'Intervention', 'Time+',
+                 'Intercept', 'Time', 'Intervention', 'Time+',
                  '[25, 35)', '[35, 45)', '[45, 55)', '[55, 65)',
                  '[Below GCSE and other]', '[GCSE, A-level or equivalent]',
                  '[Asian]', '[Black]', '[Mixed]', '[Other]',
                  '[Unmarried]',
                  '[Female]',
                  '[2]', '[3]', '[4]', '[5]', '[6]', '[7]', '[8]', '[9]', '[10]',
-                 '[2]', '[3]', '[4]', '[5]') %>% 
-               factor(., levels = c('Intercept', 'Year', 'Intervention', 'Year+',
+                 '[2]', '[3]', '[4]') %>% 
+               factor(., levels = c('Intercept', 'Time', 'Intervention', 'Time+',
                                     '[25, 35)', '[35, 45)', '[45, 55)', '[55, 65)',
                                     '[Below GCSE and other]', '[GCSE, A-level or equivalent]',
                                     '[Asian]', '[Black]', '[Mixed]', '[Other]',
@@ -827,7 +720,7 @@ fitSummaryPlotData <-
                        rep('Relative to [Married or civil partnership]', times = 1),
                        rep('Relative to [Male]', times = 1),
                        rep('Deprivation relative to [1]', times = 9),
-                       rep('Ethnic mix relative to [1]', times = 4)) %>%
+                       rep('Diversity relative to [1]', times = 3)) %>%
                factor(., 
                       levels = c('Control ITS terms',
                                  'Exposed ITS terms',
@@ -837,7 +730,7 @@ fitSummaryPlotData <-
                                  'Relative to [Married or civil partnership]',
                                  'Relative to [Male]',
                                  'Deprivation relative to [1]',
-                                 'Ethnic mix relative to [1]')),
+                                 'Diversity relative to [1]')),
              lower = fit$summary.fixed[,3],
              median = fit$summary.fixed[,4],
              upper = fit$summary.fixed[,5])
@@ -851,12 +744,12 @@ fitSummaryPlot <-
   ggplot2::labs(x = '', y = '') +
   ggplot2::facet_wrap(~ group, scales = 'free') +
   my.theme(legend.title = element_blank(),
-           text = element_text(size = textSize),
+           text = element_text(size = text.size),
            legend.position = 'bottom')
 fitSummaryPlot
 
-if(saveImage){
-  ggplot2::ggsave(filename = paste0(resDir_figures, '/fitSummaryPlot.png'),
+if(save.image){
+  ggplot2::ggsave(filename = 'fitSummaryPlot.png',
                   plot = fitSummaryPlot,
                   height = height, width = 2.5*width) 
 }
@@ -865,42 +758,136 @@ if(saveImage){
 
 ltlaMissing.EB <-
   theta.predictor %>% 
-  dplyr::select(exposed, treatment, localAuthority) %>%  
+  dplyr::select(exposed, treatment, LAD22NM) %>%  
   dplyr::filter(exposed == 'Exposed', treatment == 0) %>% 
   dplyr::distinct() %>% 
-  dplyr::pull(localAuthority) %>% 
+  dplyr::pull(LAD22NM) %>% 
   sort()
 
 ltlaMissing.EA <-
   theta.predictor %>% 
-  dplyr::select(exposed, treatment, localAuthority) %>%  
+  dplyr::select(exposed, treatment, LAD22NM) %>%  
   dplyr::filter(exposed == 'Exposed', treatment == 1) %>% 
   dplyr::distinct() %>% 
-  dplyr::pull(localAuthority) %>% 
+  dplyr::pull(LAD22NM) %>% 
   sort()
 
 ltlaMissing.CB <-
   theta.predictor %>% 
-  dplyr::select(exposed, treatment, localAuthority) %>%  
+  dplyr::select(exposed, treatment, LAD22NM) %>%  
   dplyr::filter(exposed == 'Control', treatment == 0) %>% 
   dplyr::distinct() %>% 
-  dplyr::pull(localAuthority) %>% 
+  dplyr::pull(LAD22NM) %>% 
   sort()
 
 ltlaMissing.CA <-
   theta.predictor %>% 
-  dplyr::select(exposed, treatment, localAuthority) %>%  
+  dplyr::select(exposed, treatment, LAD22NM) %>%  
   dplyr::filter(exposed == 'Control', treatment == 1) %>% 
   dplyr::distinct() %>% 
-  dplyr::pull(localAuthority) %>% 
+  dplyr::pull(LAD22NM) %>% 
   sort()
 
-setdiff(ltlaPoly_England$LAD21NM, ltlaMissing.EB) %>% length() +
-  setdiff(ltlaPoly_England$LAD21NM, ltlaMissing.EA) %>% length() +
-  setdiff(ltlaPoly_England$LAD21NM, ltlaMissing.CB) %>% length() +
-  setdiff(ltlaPoly_England$LAD21NM, ltlaMissing.CA) %>% length()
+setdiff(poly.lad.england$LAD22NM, ltlaMissing.EB) %>% length() +
+  setdiff(poly.lad.england$LAD22NM, ltlaMissing.EA) %>% length() +
+  setdiff(poly.lad.england$LAD22NM, ltlaMissing.CB) %>% length() +
+  setdiff(poly.lad.england$LAD22NM, ltlaMissing.CA) %>% length()
 
-setdiff(ltlaPoly_England$LAD21NM, ltlaMissing.EB) %>% length()
-setdiff(ltlaPoly_England$LAD21NM, ltlaMissing.EA) %>% length()
-setdiff(ltlaPoly_England$LAD21NM, ltlaMissing.CB) %>% length()
-setdiff(ltlaPoly_England$LAD21NM, ltlaMissing.CA) %>% length()
+setdiff(poly.lad.england$LAD22NM, ltlaMissing.EB) %>% length()
+setdiff(poly.lad.england$LAD22NM, ltlaMissing.EA) %>% length()
+setdiff(poly.lad.england$LAD22NM, ltlaMissing.CB) %>% length()
+setdiff(poly.lad.england$LAD22NM, ltlaMissing.CA) %>% length()
+
+## odds ratio ----
+
+### all fixed parameters ----
+
+fixed.parametere.odds.ratio.data <-
+  theta.parameter %>% 
+  dplyr::filter(!startsWith(level, 'time.month_id'),
+                !startsWith(level, 'space_id')) %>%  
+  # relative risk and then summarise
+  dplyr::mutate(dplyr::select(., starts_with('theta:')) %>%
+                  exp() %>% 
+                  apply(., 1, my.summary) %>% 
+                  lapply(., data.frame) %>%
+                  do.call(rbind, .)) %>%
+  dplyr::select(-starts_with('theta:')) %>% 
+  cbind(., 
+        covariateLevel = 
+          c('Intercept', 'Time', 'Intervention', 'Time+',
+            'Intercept', 'Time', 'Intervention', 'Time+',
+            '[25, 35)', '[35, 45)', '[45, 55)', '[55, 65)',
+            '[Below GCSE and other]', '[GCSE, A-level or equivalent]',
+            '[Asian]', '[Black]', '[Mixed]', '[Other]',
+            '[Unmarried]',
+            '[Female]',
+            '[2]', '[3]', '[4]', '[5]', '[6]', '[7]', '[8]', '[9]', '[10]',
+            '[2]', '[3]', '[4]') %>% 
+          factor(., levels = c('Intercept', 'Time', 'Intervention', 'Time+',
+                               '[25, 35)', '[35, 45)', '[45, 55)', '[55, 65)',
+                               '[Below GCSE and other]', '[GCSE, A-level or equivalent]',
+                               '[Asian]', '[Black]', '[Mixed]', '[Other]',
+                               '[Unmarried]',
+                               '[Female]',
+                               '[2]', '[3]', '[4]', '[5]', '[6]', '[7]', '[8]', '[9]', '[10]')),
+        covariate = c(rep('Control ITS terms', times = 4),
+                      rep('Exposed ITS terms', times = 4),
+                      rep('Relative to [16, 25)', times = 4),
+                      rep('Relative to [Degree or higher]', times = 2),
+                      rep('Relative to [White]', times = 4),
+                      rep('Relative to [Married or civil partnership]', times = 1),
+                      rep('Relative to [Male]', times = 1),
+                      rep('Deprivation relative to [1]', times = 9),
+                      rep('Diversity relative to [1]', times = 3)) %>%
+          factor(., 
+                 levels = c('Control ITS terms',
+                            'Exposed ITS terms',
+                            'Relative to [16, 25)',
+                            'Relative to [Degree or higher]',
+                            'Relative to [White]',
+                            'Relative to [Married or civil partnership]',
+                            'Relative to [Male]',
+                            'Deprivation relative to [1]',
+                            'Diversity relative to [1]')))
+
+fixed.parametere.odds.ratio.plot <-
+  ggplot2::ggplot(fixed.parametere.odds.ratio.data, aes(x = covariateLevel, y = median)) +
+  # ggplot2::geom_hline(yintercept = 1, colour = 'black', linetype = 'dashed') +
+  ggplot2::geom_point() +
+  ggplot2::geom_errorbar(aes(ymin = lower, ymax = upper), width = .05) +
+  ggplot2::labs(x = '', y = '') +
+  ggplot2::facet_wrap(~ covariate, scales = 'free') +
+  my.theme(legend.title = element_blank(),
+           text = element_text(size = text.size),
+           legend.position = 'bottom')
+fixed.parametere.odds.ratio.plot
+
+if(save.image){
+  ggplot2::ggsave(filename = 'fitParameters_OddsRatio.png',
+                  plot = fixed.parametere.odds.ratio.plot,
+                  height = height, width = 2.5*width) 
+}
+
+### causal terms ----
+
+casual.parameters.odds.ratio <-
+  theta.parameter %>% 
+  dplyr::filter(grepl(pattern = 'exposed', x = level)) %>% 
+  dplyr::mutate(parameter = 'Exposed',
+                parameterLabel = 
+                  level %>% 
+                  factor(., 
+                         levels = paste0(c('exposed_id2', 'time.exposed_id', 'treatment.exposed_id', 'timeSinceTreatment.exposed_id'), ':1'),
+                         labels = c('Baseline', 'Time', 'Intercention', 'Time+'))) %>%
+  dplyr::mutate(dplyr::select(., starts_with('theta:')) %>% 
+                  exp() %>% 
+                  apply(., 1, my.summary) %>% 
+                  lapply(., data.frame) %>%
+                  do.call(rbind, .)) %>%
+  dplyr::select(parameterLabel, lower, median, upper)
+
+print(x = xtable::xtable(casual.parameters.odds.ratio, digits = 4), 
+      include.rownames = FALSE,
+      file = 'causalParametersOddsRatio.tex')
+

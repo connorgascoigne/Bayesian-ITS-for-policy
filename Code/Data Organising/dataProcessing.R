@@ -8,27 +8,28 @@ library(sf)
 # directories ----
 
 # extract file location of this script
-codePath <- rstudioapi::getActiveDocumentContext()$path
-codePathSplitted <- strsplit(codePath, "/")[[1]]
+code.path <- rstudioapi::getActiveDocumentContext()$path
+code.path.splitted <- strsplit(code.path, '/')[[1]]
 
 # retrieve directories
-homeDir <- paste(codePathSplitted[1: (length(codePathSplitted)-3)], collapse = "/")
-codeDir <- paste0(homeDir, '/Code')
-dataDir <- paste0(homeDir, '/Data')
-surveyDir <- paste0(dataDir, '/rawData/STATA')
-surveyDir_general <- paste0(surveyDir, '/UKDA-6614-stata/stata/stata13_se/ukhls/')
-surveyDir_la <- paste0(surveyDir, '/UKDA-6666-stata/stata/stata13/ukhls/')
-surveyDir_lsoa <- paste0(surveyDir, '/UKDA-7248-stata/stata/stata13/ukhls/')
-dataDir_organised <- paste0(dataDir, '/Organised Data')
+home.dir <- paste(code.path.splitted[1: (length(code.path.splitted)-3)], collapse = '/')
+code.dir <- paste0(home.dir, '/Code')
+data.dir <- paste0(home.dir, '/Data')
+data.survey.dir <- paste0(data.dir, '/rawData/STATA')
+data.survey.general.dir <- paste0(data.survey.dir, '/UKDA-6614-stata/stata/stata13_se/ukhls/')
+data.survey.lad.dir <- paste0(data.survey.dir, '/UKDA-6666-stata/stata/stata13/ukhls/')
+data.survey.lsoa.dir <- paste0(data.survey.dir, '/UKDA-7248-stata/stata/stata13/ukhls/')
+data.organised.dir <- paste0(data.dir, '/Organised Data')
+data.spatial.dir <- paste0(data.dir, '/shapeFiles')
 
 # organised data folder
-if(!dir.exists(paths = dataDir_organised)) {
-  dir.create(path = dataDir_organised)
+if(!dir.exists(paths = data.organised.dir)) {
+  dir.create(path = data.organised.dir)
 }
 
 # import functions ----
 
-source(paste0(codeDir, '/functions.R'))
+source(paste0(code.dir, '/functions.R'))
 
 # ukhls data ----
 
@@ -36,11 +37,11 @@ source(paste0(codeDir, '/functions.R'))
 
 ### list of files to import ----
 
-listhh <- list.files(path = surveyDir_general, pattern = '*_hhresp.dta')
+list.hh <- list.files(path = data.survey.general.dir, pattern = '*_hhresp.dta')
 
 ### load in the files ----
 
-hh <- lapply(paste0(surveyDir_general, listhh), haven::read_dta)
+hh <- lapply(paste0(data.survey.general.dir, list.hh), haven::read_dta)
 hh <- 
   lapply(hh, function(x) {
     x %>%
@@ -128,7 +129,7 @@ hh <-
         dplyr::ends_with('fimnsben_dv')
       )
   })
-names(hh) <- gsub('\\.dta$', '', listhh)
+names(hh) <- gsub('\\.dta$', '', list.hh)
 
 ### extract dataframes from list ----
 
@@ -137,11 +138,11 @@ list2env(hh, .GlobalEnv)
 
 ## individual survey ----
 
-listind <- list.files(path = surveyDir_general, pattern = '*_indresp.dta')
+list.ind <- list.files(path = data.survey.general.dir, pattern = '*_indresp.dta')
 
 ### load in the files ----
 
-ind <- lapply(paste0(surveyDir_general, listind), haven::read_dta)
+ind <- lapply(paste0(data.survey.general.dir, list.ind), haven::read_dta)
 ind <- 
   lapply(ind, function(x) {
     x %>%
@@ -229,37 +230,37 @@ ind <-
         dplyr::ends_with('fimnsben_dv')
       )
   })
-names(ind) <- gsub('\\.dta$', '', listind)
+names(ind) <- gsub('\\.dta$', '', list.ind)
 
 ### extract dataframes from list ----
 
 list2env(ind, .GlobalEnv)
 # rm(ind)
 
-## local authority survey ----
+## local authority district survey ----
 
-listla <- list.files(path = surveyDir_la, pattern = '*_oslaua_protect.dta')
+list.lad <- list.files(path = data.survey.lad.dir, pattern = '*_oslaua_protect.dta')
 
 ### load in the files ----
 
-la <- lapply(paste0(surveyDir_la, listla), haven::read_dta)
-la <- lapply(la, function(x) {x})
-names(la) <- gsub('\\.dta$', '', listla)
+lad <- lapply(paste0(data.survey.lad.dir, list.lad), haven::read_dta)
+lad <- lapply(lad, function(x) {x})
+names(lad) <- gsub('\\.dta$', '', list.lad)
 
 ### extract dataframes from list ----
 
-list2env(la, .GlobalEnv)
-# rm(la)
+list2env(lad, .GlobalEnv)
+# rm(lad)
 
 ## lower layer super output area survey ----
 
-listlsao <- list.files(path = surveyDir_lsoa, pattern = '*_lsoa11_protect.dta')
+list.lsao <- list.files(path = data.survey.lsoa.dir, pattern = '*_lsoa11_protect.dta')
 
 ### load in the files ----
 
-lsao <- lapply(paste0(surveyDir_lsoa, listlsao), haven::read_dta)
+lsao <- lapply(paste0(data.survey.lsoa.dir, list.lsao), haven::read_dta)
 lsao <- lapply(lsao, function(x) {x})
-names(lsao) <- gsub('\\.dta$', '', listlsao)
+names(lsao) <- gsub('\\.dta$', '', list.lsao)
 
 ### extract dataframes from list ----
 
@@ -270,17 +271,17 @@ list2env(lsao, .GlobalEnv)
 
 ### individual and household per wave ----
 
-nWave <- length(listhh)
+num.wave <- length(list.hh)
 
-mergTerms <- 
-  data.frame(ind = gsub('\\.dta$', '', listind),
-             hh = gsub('\\.dta$', '', listhh),
-             la = gsub('\\.dta$', '', listla),
-             lsao = gsub('\\.dta$', '', listlsao),
-             by = paste0(gsub('\\_indresp.dta$', '', listind), '_hidp'))
+merg.terms <- 
+  data.frame(ind = gsub('\\.dta$', '', list.ind),
+             hh = gsub('\\.dta$', '', list.hh),
+             lad = gsub('\\.dta$', '', list.lad),
+             lsao = gsub('\\.dta$', '', list.lsao),
+             by = paste0(gsub('\\_indresp.dta$', '', list.ind), '_hidp'))
 
 u <- 
-  apply(mergTerms, 1,
+  apply(merg.terms, 1,
         function(x){
           final <- 
             (parse(text = x[1]) %>% eval) %>%
@@ -292,7 +293,7 @@ u <-
                              by = x[5] %>% as.character())
           final 
         })
-names(u) <- paste0('u', 1:nWave)
+names(u) <- paste0('u', 1:num.wave)
 
 ### all waves ----  
 
@@ -300,7 +301,7 @@ usoc <- Reduce(function(x,y) merge(x, y, by = 'pidp', all = TRUE), u)
 
 ## clean up environment ----
 
-rm(list = ls(pattern = '[0-9]$'), ind, hh, la)
+rm(list = ls(pattern = '[0-9]$'), ind, hh, lad)
 rm(list = ls(pattern = 'resp'))
 
 ## clean up data frame ----
@@ -312,15 +313,15 @@ names(usoc) <- str_replace(names(usoc), '_(cc)$', '')
 
 # select weights
 ## most recent longitudinal
-longitudinalWeight <-
-  u[[paste0('u', nWave)]] %>%
+longitudinal.weight <-
+  u[[paste0('u', num.wave)]] %>%
   dplyr::select(pidp, 
                 dplyr::contains('indpxus_lw'),
                 dplyr::contains('indinus_lw')) %>%
-  dplyr::rename('longitudinalWeightProxy' = paste0(letters[nWave], '_indpxus_lw'),
-                'longitudinalWeight' = paste0(letters[nWave], '_indinus_lw'))
+  dplyr::rename('longitudinalWeightProxy' = paste0(letters[num.wave], '_indpxus_lw'),
+                'longitudinalWeight' = paste0(letters[num.wave], '_indinus_lw'))
 ## first cross sectional
-crossSectionalWeight <-
+cross.sectional.weight <-
   u[[paste0('u', 1)]] %>%
   dplyr::select(pidp, 
                 dplyr::contains('indinus_xw')) %>%
@@ -331,102 +332,77 @@ crossSectionalWeight <-
 ### Wave 1 does not have one and they are not needed due to the left_join later
 ## pivot longer each variable for waves are now long
 ## include the most recent weights using the pidp
-usocLong <- 
+usoc.long <- 
   usoc %>%
   select(-dplyr::contains(c('_indinus_xw', '_indpxus_lw', '_indinus_lw'))) %>%
   tidyr::pivot_longer(cols = -pidp, names_to = c('wave', '.value'), names_sep = '_') %>%
-  dplyr::left_join(., longitudinalWeight, by = 'pidp') %>%
-  dplyr::left_join(., crossSectionalWeight, by = 'pidp') %>%
+  dplyr::left_join(., longitudinal.weight, by = 'pidp') %>%
+  dplyr::left_join(., cross.sectional.weight, by = 'pidp') %>%
   dplyr::relocate(c('hidp', 'crossSectionalWeight', 'longitudinalWeightProxy', 'longitudinalWeight'), .before = wave) %>%
-  dplyr::mutate(interviewDate = paste(intdaty, intdatm, intdatd, sep = '-') %>% as.Date(., "%Y-%m-%d"),
+  dplyr::mutate(interviewDate = paste(intdaty, intdatm, intdatd, sep = '-') %>% as.Date(., '%Y-%m-%d'),
                 wave = wave %>% as.factor() %>% as.numeric()) %>%
   dplyr::relocate(interviewDate, .before = intdatd) %>%
   dplyr::select(-intdaty, -intdatm, -intdatd)
 
 ## include additional data ----
 
+setwd(data.dir)
+
 ### spatial ----
 
-# spatial at lsoa level for deprivation and diversity
-onsShapePath <- 'Data/shapeFiles_ons2/'
-lsoaPoly <- 
-  sf::st_read(paste0(onsShapePath, 'ons21_GBR_LSOA_shp/ons21_GBR_LSOA.shp'))
-lsoaPoly_England <- 
-  lsoaPoly %>% 
-  dplyr::filter(str_detect(LSOA21CD, "^E"))
+# spatial polygons at lsoa and lad levels
+poly.lsoa <- sf::st_read(dsn = data.spatial.dir, layer = 'ONS11_LSOA')
+poly.lad <- sf::st_read(dsn = data.spatial.dir, layer = 'ONS22_LAD')
+
+# england only
+poly.lsoa.england <- poly.lsoa %>%  dplyr::filter(str_detect(LSOA11CD, '^E'))
+poly.lad.england <- poly.lad %>%  dplyr::filter(str_detect(LAD22CD, '^E'))
+
+# make a-mats
+lsoa.mat <- spdep::poly2nb(as(poly.lsoa.england, 'Spatial'))
+lsoa.mat <- spdep::nb2mat(lsoa.mat, zero.policy = TRUE)
+colnames(lsoa.mat) <- rownames(lsoa.mat) <- paste0('lsoa_', 1:dim(lsoa.mat)[1])
+lsoa.names <- data.frame(LSOA11CD = poly.lsoa.england$LSOA11CD,
+                         LSOA11NM = poly.lsoa.england$LSOA11NM,
+                         Internal = rownames(lsoa.mat))
+
+lad.mat <- spdep::poly2nb(as(poly.lad.england, 'Spatial'))
+lad.mat <- spdep::nb2mat(lad.mat, zero.policy = TRUE)
+colnames(lad.mat) <- rownames(lad.mat) <- paste0('lad_', 1:dim(lad.mat)[1])
+lad.names <- data.frame(LAD22CD = poly.lad.england$LAD22CD,
+                        LAD22NM = poly.lad.england$LAD22NM,
+                        Internal = rownames(lad.mat))
+
+### confounders ----
+
+#### raw data ----
 
 # look up from 2011 lsoa to 2021 lsoa and 2021 ltla
-lsoa11_lookup <- 
-  read.csv('Data/rawData/UK Gov/lsoa11_to_lsao21_and_ltla22.csv') %>% 
-  dplyr::rename(LAD21NM = 'LAD22NM',
-                LAD21CD = 'LAD22CD') %>% 
-  dplyr::filter(str_detect(LSOA11CD, "^E"))
-
-### raw data ----
+lookup.01.11 <- read.csv('rawData/UK Gov/LSOA01_LSOA11_LAD11_lookUp.csv')
+lookup.11.21 <- read.csv('rawData/UK Gov/LSOA11_LSOA21_LAD22_lookUp.csv')
 
 # raw imd data
-imd2011 <- 
-  read.csv('Data/rawData/UK Gov/imd2011_lsoa.csv') %>%
-  dplyr::select(`LSOA.code..2011.`,
-                `LSOA.name..2011.`,
-                `Index.of.Multiple.Deprivation..IMD..Rank..where.1.is.most.deprived.`) %>%
-  dplyr::rename('LSOA11CD' = `LSOA.code..2011.`,
-                'LSOA11NM' = `LSOA.name..2011.`,
-                'imdRank' = `Index.of.Multiple.Deprivation..IMD..Rank..where.1.is.most.deprived.`)
-
+load('Organised Data/LSOA11_2002_2021_IMD.rda')
 # raw ethncity data
-ethnicity2021 <- 
-  read.csv(file = 'Data/rawData/UK Gov/ethnicity2021_lsoa.csv', stringsAsFactors = TRUE) %>%
-  dplyr::rename('LSOA21CD' = 'Lower.layer.Super.Output.Areas.Code',
-                'ethnicityCD' = 'Ethnic.group..20.categories..Code',
-                'count' = 'Observation') %>%
-  # aggregate counts over bame and non-bame
-  dplyr::mutate(ethnicityGroup = dplyr::if_else(ethnicityCD %in% 13:17, 'nonBameCount', 'bameCount')) %>% 
-  dplyr::group_by(LSOA21CD, ethnicityGroup) %>% 
-  dplyr::summarise(count = sum(count)) %>%
-  dplyr::ungroup() %>% 
-  tidyr::pivot_wider(names_from = ethnicityGroup, 
-                     values_from = count) %>% 
-  dplyr::mutate(
-    # percentages
-    bamePercentage = bameCount/(bameCount + nonBameCount),
-    nonBamePercentage = nonBameCount/(bameCount + nonBameCount),
-    # rank based on percentage
-    bameRank = bamePercentage %>% dplyr::desc() %>% dplyr::dense_rank())
+load('Organised Data/LSOA11_2002_2021_ETHNIC_DIVERSITY.rda')
 
-### sorted data ----
+#### sorted data ----
 
-# deprivation data
-deprivationData <- 
-  lsoaPoly_England %>% 
-  dplyr::select(LSOA21CD, LSOA21NM) %>% 
-  sf::st_drop_geometry() %>% 
-  dplyr::left_join(., lsoa11_lookup %>% dplyr::select(LSOA11CD, LAD21CD, LAD21NM, LSOA21CD), by = 'LSOA21CD') %>% 
-  dplyr::left_join(., imd2011, by = 'LSOA11CD') %>% 
-  dplyr::select(LSOA11CD, LSOA21CD, LSOA21NM, LAD21NM, imdRank) %>%
-  # include tiles
-  dplyr::mutate(imd10 = dplyr::ntile(imdRank, 10) %>% factor(., labels = 1:10),
-                imd5 = dplyr::ntile(imdRank, 5) %>% factor(., labels = 1:5),
-                imd4 = dplyr::ntile(imdRank, 4) %>% factor(., labels = 1:4))
+imd.02.21.sorted <-
+  imd.02.21 %>%
+  dplyr::mutate(DEPRIVATION = DEPRIVATION %>% factor()) %>%
+  dplyr::select(LSOA11CD, YEAR, DEPRIVATION)
 
-# diversity data
-diversityData <-
-  lsoaPoly_England %>% 
-  dplyr::select(LSOA21CD, LSOA21NM) %>% 
-  sf::st_drop_geometry()  %>% 
-  dplyr::left_join(., lsoa11_lookup %>% dplyr::select(LSOA11CD, LAD21CD, LAD21NM, LSOA21CD), by = 'LSOA21CD') %>% 
-  dplyr::left_join(., ethnicity2021, by = 'LSOA21CD') %>% 
-  dplyr::select(LSOA11CD, LSOA21CD, LSOA21NM, LAD21NM, bamePercentage, bameRank) %>%
-  # include tiles
-  dplyr::mutate(bame10 = cut((1-bamePercentage), breaks = seq(from = 0, to = 1, by = 0.1)) %>% factor(., labels = 1:10),
-                bame5 = cut((1-bamePercentage), breaks = seq(from = 0, to = 1, by = 0.2)) %>% factor(., labels = 1:5),
-                bame4 = cut((1-bamePercentage), breaks = seq(from = 0, to = 1, by = 0.25)) %>% factor(., labels = 1:4))
+ed.02.21.sorted <-
+  ed.02.21 %>%
+  dplyr::mutate(DIVERSITY = DIVERSITY %>% factor()) %>%
+  dplyr::select(LSOA11CD, YEAR, DIVERSITY)
 
-### combine with final data ----
+#### combine with final data ----
 
-# final data 
-dataFinal <-
-  usocLong %>%
+# final data
+data.final <-
+  usoc.long %>%
   # # un comment for more clear output for checking
   # dplyr::select(pidp, wave, interviewDate, oslaua, lsoa11) %>%
   # remove NAs from interview and LAD11CD
@@ -436,33 +412,18 @@ dataFinal <-
   # only england
   dplyr::filter(stringr::str_detect(LSOA11CD, '^E')) %>%
   # include LAD21 and LSOA21 codes and names
-  dplyr::left_join(., lsoa11_lookup %>% dplyr::select(LSOA11CD, LAD21NM, LAD21CD, LAD21CD, LSOA21CD, LSOA21NM), by = 'LSOA11CD', relationship = 'many-to-many') %>% 
-  # include imd11 data
-  dplyr::left_join(., deprivationData %>% dplyr::select(-LSOA21CD, -LSOA21NM, -LAD21NM), by = 'LSOA11CD', relationship = 'many-to-many') %>%
-  # include bame21 data
-  dplyr::left_join(., diversityData %>% dplyr::select(-LSOA21CD, -LSOA21NM, -LAD21NM), by = 'LSOA11CD', relationship = 'many-to-many')
-
-
-# spatial data ----
-
-ltlaPoly <- 
-  sf::st_read(paste0(onsShapePath, 'ons21_GBR_LTLA_shp/ons21_GBR_LTLA.shp'))
-ltlaPoly_England <- 
-  ltlaPoly %>% 
-  dplyr::filter(str_detect(LAD21CD, "^E"))
-
-aMat_england <- getAmat(geo = ltlaPoly_England, names = ltlaPoly_England$LAD21NM)
-colnames(aMat_england) <- rownames(aMat_england) <- ltlaPoly_England$LAD21NM
+  dplyr::left_join(., lookup.11.21 %>% dplyr::select(LSOA11CD, LAD22NM, LAD22CD), by = 'LSOA11CD', relationship = 'many-to-many') %>%
+  # join imd and diversity data
+  ## need YEAR variable
+  dplyr::mutate(YEAR = year(interviewDate)) %>%
+  ## joins
+  dplyr::left_join(., imd.02.21.sorted, by = c('LSOA11CD', 'YEAR'), relationship = 'many-to-many') %>%
+  dplyr::left_join(., ed.02.21.sorted, by = c('LSOA11CD', 'YEAR'), relationship = 'many-to-many')
 
 # saving ----
 
-## final save ----
-
-saveRDS(object = dataFinal,
-        file = paste0(dataDir_organised, '/ukhls_final.rds'))
-
-saveRDS(object = usocLong,
-        file = paste0(dataDir_organised, '/ukhls_dropout.rds'))
-
-saveRDS(aMat_england, 
-        file = paste0(dataDir_organised, '/aMat_england.rds'))
+setwd(data.organised.dir)
+saveRDS(object = data.final, file = 'ukhls_final.rds')
+saveRDS(object = usoc.long, file = 'ukhls_dropout.rds')
+save(lsoa.mat, lad.mat, file = 'aMat_england.rds')
+save(lsoa.names, lad.names, file = 'aMat_names_england.rds')
