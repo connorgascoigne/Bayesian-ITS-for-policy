@@ -1,5 +1,5 @@
-% latex table generated in R 4.2.1 by xtable 1.8-4 package
-% Wed Nov 15 10:39:26 2023
+% latex table generated in R 4.2.2 by xtable 1.8-4 package
+% Mon Feb 26 10:44:31 2024
 \begin{table}[ht]
 \centering
 \begin{tabular}{lll}

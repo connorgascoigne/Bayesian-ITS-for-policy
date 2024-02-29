@@ -54,6 +54,60 @@ my.summary <- function(x, CI = 0.95) {
   
 }
 
+# extract posterior samples ----
+
+extractSamples <- function(data, fit, n.sims, ...){
+  
+  # data = all.datas[[2]]
+  # fit = fit.05
+  # n.sims = 10
+  
+  set.seed(11)
+  
+  ### marginals from INLA ----
+  
+  samp.all <- INLA::inla.posterior.sample(n = n.sims, result = fit, intern = TRUE, ...) # <--- remove selection from havard
+  
+  ### extract samples ----
+  
+  # linear predictor
+  theta.predictor.a <-
+    lapply(X = samp.all,
+           FUN = function(x) {x$latent[startsWith(rownames(x$latent), 'Predictor:')]}) %>%
+    unlist() %>%
+    matrix(., ncol = n.sims)
+  # all model parameters
+  theta.parameter.a <-
+    lapply(X = samp.all,
+           FUN = function(x) {x$latent[!startsWith(rownames(x$latent), 'Predictor:')]}) %>%
+    unlist() %>%
+    matrix(., ncol = n.sims)
+  
+  ### organise ----
+  
+  # linear predictor
+  colnames(theta.predictor.a) <- paste0('theta:', 1:n.sims)
+  theta.predictor <- 
+    cbind(data %>% 
+            dplyr::rename(diversity = DIVERSITY,
+                          deprivation = DEPRIVATION) %>% 
+            dplyr::select(LAD22CD, LAD22NM,
+                          ucStartDate, interviewDate, time, treatment, exposed, 
+                          age, edu, ethn, rela, sex, diversity, deprivation), 
+          theta.predictor.a) %>% 
+    arrange(time, treatment, LAD22CD, exposed)
+  
+  # all model predictor
+  colnames(theta.parameter.a) <- paste0('theta:', 1:n.sims)
+  theta.parameter <- 
+    data.frame(parameter = rownames(samp.all[[1]]$latent)[!startsWith(rownames(samp.all[[1]]$latent), 'Predictor:')]) %>% 
+    cbind(., theta.parameter.a)
+  
+  return(list(theta.predictor = theta.predictor,
+              theta.parameter = theta.parameter))
+  
+}
+
 # expit ----
 
 expit <- function (x){
@@ -64,4 +118,54 @@ expit <- function (x){
 
 logit <- function(x){
   return(log(x/(1 - x)))
+}
+
+# multiple model fits ----
+
+inla.model.fit <- function(formula, data){
+  
+  weightsFinal <- data$sampleWeight
+  
+  inla.mode = 'experimental';
+  control.compute = list(config = TRUE, waic = TRUE)
+  control.predictor = list(compute = TRUE, link = 1)
+  control.inla = list(strategy = 'adaptive', int.strategy = 'auto')
+  family = 'gaussian'
+  
+  INLA::inla(formula, 
+             family = family, 
+             data = data, 
+             weights = weightsFinal,
+             control.compute = control.compute, 
+             control.predictor = control.predictor, 
+             control.inla = control.inla, 
+             inla.mode = inla.mode)
+  
+}
+
+# model scores ----
+
+model.scores <- function(results, true, alpha = 0.05){
+  
+  median <- results$summary.fitted.values$`0.5quant`
+  lower <- results$summary.fitted.values$`0.025quant`
+  upper <- results$summary.fitted.values$`0.975quant`
+  
+  # variance scores
+  mae <- (median - true) %>% abs()
+  mse <- (median - true)^2
+  
+  # distribution score
+  dispersion <- (upper - lower)
+  overPrediction <- 2/alpha * (lower - true) * (true < lower)
+  underPrediction <- 2/alpha * (true - upper) * (true > upper)
+  intervalScore <- (dispersion + underPrediction + overPrediction) %>% mean()
+  width <- dispersion %>% mean()
+  coverage <- ((lower < true & true < upper) %>% sum())/length(true)
+  
+  return(list(mae = mae, mse = mse,
+              intervalScore = intervalScore,
+              width = width,
+              coverage = coverage))
+  
 }

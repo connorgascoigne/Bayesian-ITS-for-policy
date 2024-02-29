@@ -22,11 +22,6 @@ data.survey.lsoa.dir <- paste0(data.survey.dir, '/UKDA-7248-stata/stata/stata13/
 data.organised.dir <- paste0(data.dir, '/Organised Data')
 data.spatial.dir <- paste0(data.dir, '/shapeFiles')
 
-# organised data folder
-if(!dir.exists(paths = data.organised.dir)) {
-  dir.create(path = data.organised.dir)
-}
-
 # import functions ----
 
 source(paste0(code.dir, '/functions.R'))

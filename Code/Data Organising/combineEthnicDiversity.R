@@ -84,10 +84,10 @@ ed.01.sorted <-
                                       White =  White %>% mean(),
                                       .by = 'LSOA11CD') %>% 
                      ## define diversity
-                     dplyr::mutate(DIVERSITY = dplyr::case_when(0 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.06 ~ 4,
-                                                                0.06 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.12 ~ 3,
-                                                                0.12 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.24 ~ 2,
-                                                                0.24 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other <= 1.00 ~ 1,
+                     dplyr::mutate(DIVERSITY = dplyr::case_when(0 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.06 ~ 1,
+                                                                0.06 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.12 ~ 2,
+                                                                0.12 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.24 ~ 3,
+                                                                0.24 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other <= 1.00 ~ 4,
                                                                 TRUE ~ NA)),
                    # join by the newly created LSOA11CDs 
                    by = 'LSOA11CD') %>% 
@@ -146,10 +146,10 @@ ed.11.sorted <-
                                       White =  White %>% mean(),
                                       .by = 'LSOA11CD') %>% 
                      ## define diversity
-                     dplyr::mutate(DIVERSITY = dplyr::case_when(0 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.09 ~ 4,
-                                                                0.09 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.18 ~ 3,
-                                                                0.18 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.36 ~ 2,
-                                                                0.36 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other <= 1.00 ~ 1,
+                     dplyr::mutate(DIVERSITY = dplyr::case_when(0 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.09 ~ 1,
+                                                                0.09 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.18 ~ 2,
+                                                                0.18 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.36 ~ 3,
+                                                                0.36 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other <= 1.00 ~ 4,
                                                                 TRUE ~ NA)),
                    # join by the newly created LSOA11CDs 
                    by = 'LSOA11CD') %>% 
@@ -238,10 +238,10 @@ ed.21.sorted <-
                                       White =  White %>% mean(),
                                       .by = 'LSOA11CD') %>% 
                      ## define diversity
-                     dplyr::mutate(DIVERSITY = dplyr::case_when(0 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.12 ~ 4,
-                                                                0.12 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.24 ~ 3,
-                                                                0.24 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.48 ~ 2,
-                                                                0.48 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other <= 1.00 ~ 1,
+                     dplyr::mutate(DIVERSITY = dplyr::case_when(0 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.12 ~ 1,
+                                                                0.12 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.24 ~ 2,
+                                                                0.24 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other < 0.48 ~ 3,
+                                                                0.48 <= Asian + Black + Mixed + Other & Asian + Black + Mixed + Other <= 1.00 ~ 4,
                                                                 TRUE ~ NA)),
                    # join by the newly created LSOA11CDs 
                    by = 'LSOA11CD') %>% 
@@ -345,7 +345,7 @@ ed.01.plot.data <-
   mutate(CENSUS = '2001 Census',
          DIVERSITY = DIVERSITY %>% 
            factor(levels = 1:4,
-                  labels = c('1 (Most Diverse)', 2:3, '4 (Least Diverse)')))
+                  labels = c('1 (Least Diverse)', 2:3, '4 (Most Diverse)')))
 
 ed.01.plot.london <-
   ggplot2::ggplot() +
@@ -354,18 +354,18 @@ ed.01.plot.london <-
                      dplyr::filter(str_detect(LAD22CD, "^E09")), 
                    aes(fill = DIVERSITY),
                    colour = NA) +
-  ggplot2::scale_fill_viridis_d(name = 'Diversity', direction = 1, option = 'G', na.value = 'red') +
+  ggplot2::scale_fill_viridis_d(name = 'Diversity', direction = -1, option = 'G', na.value = 'red') +
   myMapTheme(legend.position = 'none')
 
 ed.01.plot <- 
   ggplot2::ggplot() +
   ggplot2::geom_sf(data = poly.nat.england, fill = 'white') +
   ggplot2::geom_sf(data = ed.01.plot.data, aes(fill = DIVERSITY), colour = NA) +
-  ggplot2::scale_fill_viridis_d(name = 'Diversity', direction = 1, option = 'G', na.value = 'red') +
+  ggplot2::scale_fill_viridis_d(name = 'Diversity', direction = -1, option = 'G', na.value = 'red') +
   # add london in seperately
   ggplot2::geom_rect(aes(xmin = 490000, xmax = 560000, ymin = 150000, ymax = 210000), color = 'red', linewidth = 1, fill = NA) +
   ggplot2::annotation_custom(ggplot2::ggplotGrob(ed.01.plot.london), xmin = 82700, xmax = 300000, ymin = 160000, ymax = 450000) +
-  ggplot2::facet_grid(~ CENSUS) +
+  # ggplot2::facet_grid(~ CENSUS) +
   myMapTheme(text = element_text(size = text.size),
              legend.title = element_blank(),
              legend.position = 'bottom')
@@ -378,7 +378,7 @@ ed.11.plot.data <-
   mutate(CENSUS = '2011 Census',
          DIVERSITY = DIVERSITY %>% 
            factor(levels = 1:4,
-                  labels = c('1 (Most Diverse)', 2:3, '4 (Least Diverse)')))
+                  labels = c('1 (Least Diverse)', 2:3, '4 (Most Diverse)')))
 
 ed.11.plot.london <-
   ggplot2::ggplot() +
@@ -387,18 +387,18 @@ ed.11.plot.london <-
                      dplyr::filter(str_detect(LAD22CD, "^E09")), 
                    aes(fill = DIVERSITY),
                    colour = NA) +
-  ggplot2::scale_fill_viridis_d(name = 'Diversity', direction = 1, option = 'G', na.value = 'red') +
+  ggplot2::scale_fill_viridis_d(name = 'Diversity', direction = -1, option = 'G', na.value = 'red') +
   myMapTheme(legend.position = 'none')
 
 ed.11.plot <- 
   ggplot2::ggplot() +
   ggplot2::geom_sf(data = poly.nat.england, fill = 'white') +
   ggplot2::geom_sf(data = ed.11.plot.data, aes(fill = DIVERSITY), colour = NA) +
-  ggplot2::scale_fill_viridis_d(name = 'Diversity', direction = 1, option = 'G', na.value = 'red') +
+  ggplot2::scale_fill_viridis_d(name = 'Diversity', direction = -1, option = 'G', na.value = 'red') +
   # add london in seperately
   ggplot2::geom_rect(aes(xmin = 490000, xmax = 560000, ymin = 150000, ymax = 210000), color = 'red', linewidth = 1, fill = NA) +
   ggplot2::annotation_custom(ggplot2::ggplotGrob(ed.11.plot.london), xmin = 82700, xmax = 300000, ymin = 160000, ymax = 450000) +
-  ggplot2::facet_grid(~ CENSUS) +
+  # ggplot2::facet_grid(~ CENSUS) +
   myMapTheme(text = element_text(size = text.size),
              legend.title = element_blank(),
              legend.position = 'bottom')
@@ -411,7 +411,7 @@ ed.21.plot.data <-
   mutate(CENSUS = '2021 Census',
          DIVERSITY = DIVERSITY %>% 
            factor(levels = 1:4,
-                  labels = c('1 (Most Diverse)', 2:3, '4 (Least Diverse)')))
+                  labels = c('1 (Least Diverse)', 2:3, '4 (Most Diverse)')))
 
 ed.21.plot.london <-
   ggplot2::ggplot() +
@@ -420,18 +420,18 @@ ed.21.plot.london <-
                      dplyr::filter(str_detect(LAD22CD, "^E09")), 
                    aes(fill = DIVERSITY),
                    colour = NA) +
-  ggplot2::scale_fill_viridis_d(name = 'Diversity', direction = 1, option = 'G', na.value = 'red') +
+  ggplot2::scale_fill_viridis_d(name = 'Diversity', direction = -1, option = 'G', na.value = 'red') +
   myMapTheme(legend.position = 'none')
 
 ed.21.plot <- 
   ggplot2::ggplot() +
   ggplot2::geom_sf(data = poly.nat.england, fill = 'white') +
   ggplot2::geom_sf(data = ed.21.plot.data, aes(fill = DIVERSITY), colour = NA) +
-  ggplot2::scale_fill_viridis_d(name = 'Diversity', direction = 1, option = 'G', na.value = 'red') +
+  ggplot2::scale_fill_viridis_d(name = 'Diversity', direction = -1, option = 'G', na.value = 'red') +
   # add london in seperately
   ggplot2::geom_rect(aes(xmin = 490000, xmax = 560000, ymin = 150000, ymax = 210000), color = 'red', linewidth = 1, fill = NA) +
   ggplot2::annotation_custom(ggplot2::ggplotGrob(ed.21.plot.london), xmin = 82700, xmax = 300000, ymin = 160000, ymax = 450000) +
-  ggplot2::facet_grid(~ CENSUS) +
+  # ggplot2::facet_grid(~ CENSUS) +
   myMapTheme(text = element_text(size = text.size),
              legend.title = element_blank(),
              legend.position = 'bottom')

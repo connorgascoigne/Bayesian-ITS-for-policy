@@ -57,6 +57,7 @@ Data/
 
 # txt files
 *.txt
+*.text
 
 # manuscript folder
 Manuscript/

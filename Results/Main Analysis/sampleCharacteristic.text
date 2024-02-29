@@ -1,0 +1,45 @@
+% latex table generated in R 4.2.1 by xtable 1.8-4 package
+% Wed Feb 21 10:52:04 2024
+\begin{table}[ht]
+\centering
+\begin{tabular}{llrr}
+  \hline
+characteristic & group & n & freq \\ 
+  \hline
+Individual & Individual & 47555 & 100.0000 \\ 
+  Employment & Unemployed &  8236 & 15.3100 \\ 
+  Employment & Not unemployed & 45574 & 84.6900 \\ 
+  Age & [16, 25) & 13795 & 21.4900 \\ 
+  Age & [25, 35) & 13081 & 20.3800 \\ 
+  Age & [35, 45) & 13624 & 21.2200 \\ 
+  Age & [45, 55) & 12946 & 20.1700 \\ 
+  Age & [55, 65) & 10747 & 16.7400 \\ 
+  Education & GCSE, A-level or equivalent & 20975 & 41.2600 \\ 
+  Education & Degree or higher & 18327 & 36.0500 \\ 
+  Education & Below GCSE and other & 11538 & 22.6900 \\ 
+  Ethnicity & Asian &  7819 & 16.4400 \\ 
+  Ethnicity & Black &  3551 & 7.4700 \\ 
+  Ethnicity & Mixed &  1385 & 2.9100 \\ 
+  Ethnicity & Other &  2097 & 4.4100 \\ 
+  Ethnicity & White & 32703 & 68.7700 \\ 
+  Relationship & Single & 22884 & 43.6600 \\ 
+  Relationship & Relationship & 29532 & 56.3400 \\ 
+  Sex & Male & 21958 & 46.1700 \\ 
+  Sex & Female & 25597 & 53.8300 \\ 
+  Deprivation & 1 &  7485 & 10.4100 \\ 
+  Deprivation & 2 &  8611 & 11.9800 \\ 
+  Deprivation & 3 &  7898 & 10.9800 \\ 
+  Deprivation & 4 &  7571 & 10.5300 \\ 
+  Deprivation & 5 &  7238 & 10.0700 \\ 
+  Deprivation & 6 &  7408 & 10.3000 \\ 
+  Deprivation & 7 &  6868 & 9.5500 \\ 
+  Deprivation & 8 &  7011 & 9.7500 \\ 
+  Deprivation & 9 &  6456 & 8.9800 \\ 
+  Deprivation & 10 &  5361 & 7.4600 \\ 
+  Diversity & 1 & 23763 & 42.5200 \\ 
+  Diversity & 2 &  9646 & 17.2600 \\ 
+  Diversity & 3 &  8304 & 14.8600 \\ 
+  Diversity & 4 & 14176 & 25.3600 \\ 
+   \hline
+\end{tabular}
+\end{table}
