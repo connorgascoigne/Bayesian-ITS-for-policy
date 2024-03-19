@@ -75,6 +75,7 @@ theta.time <- readRDS(file = 'temporalRandomEffectSamples.rds')
 
 setwd(data.dir)
 load('Organised Data/LAD22_2001_2021_IMD.rda')
+load('Organised Data/LSOA11_2001_2021_IMD.rda')
 
 # linear predictor based results ----
 
@@ -110,8 +111,7 @@ before.after.temporal.plot <-
                 y = 'Self reported mental ill health (GHQ-12)') +
   my.theme(legend.title = element_blank(),
            legend.position = 'bottom',
-           text = element_text(size = text.size))
-before.after.temporal.plot
+           text = element_text(size = text.size)); before.after.temporal.plot
 
 if(save.image){
   ggplot2::ggsave(filename = 'beforeAfter_temporalPlot.png',
@@ -123,7 +123,7 @@ if(save.image){
 
 #### overall ---- 
 
-before.after.overall.control.spatial.data <- 
+before.after.overall.control.spatial.lad.data <- 
   # overall before-after by exposure group
   theta.predictor %>%
   # filter out control
@@ -142,7 +142,7 @@ before.after.overall.control.spatial.data <-
   dplyr::mutate(exposed = 'Control',
                 timeFrame = 'Overall')
 
-before.after.overall.exposed.spatial.data <- 
+before.after.overall.exposed.spatial.lad.data <- 
   # overall before-after by exposure group
   theta.predictor %>%
   # filter out exposed
@@ -163,7 +163,7 @@ before.after.overall.exposed.spatial.data <-
 
 #### immediate ----
 
-before.after.immediate.control.spatial.data <- 
+before.after.immediate.control.spatial.lad.data <- 
   # immediate before-after by exposure group
   theta.predictor %>%
   # filter out control and year before-after
@@ -183,7 +183,7 @@ before.after.immediate.control.spatial.data <-
   dplyr::mutate(exposed = 'Control',
                 timeFrame = 'Immediate')
 
-before.after.immediate.exposed.spatial.data <- 
+before.after.immediate.exposed.spatial.lad.data <- 
   # immediate before-after by exposure group
   theta.predictor %>%
   # filter out exposed and year before-after
@@ -205,11 +205,11 @@ before.after.immediate.exposed.spatial.data <-
 
 #### overall and immediate together ----
 
-before.after.spatial.data <-
-  dplyr::bind_rows(before.after.overall.control.spatial.data,
-                   before.after.overall.exposed.spatial.data,
-                   before.after.immediate.control.spatial.data,
-                   before.after.immediate.exposed.spatial.data) %>% 
+before.after.spatial.lad.data <-
+  dplyr::bind_rows(before.after.overall.control.spatial.lad.data,
+                   before.after.overall.exposed.spatial.lad.data,
+                   before.after.immediate.control.spatial.lad.data,
+                   before.after.immediate.exposed.spatial.lad.data) %>% 
   dplyr::mutate(dplyr::select(., starts_with('theta:')) %>% 
                   apply(., 1, my.summary) %>% 
                   lapply(., data.frame) %>%
@@ -222,12 +222,12 @@ before.after.spatial.data <-
 
 #### plot ----
 
-before.after.spatial.plot <- 
+before.after.spatial.lad.plot <- 
   ggplot2::ggplot() +
   # England outline filled in with white - must be first
   ggplot2::geom_sf(data = poly.nat.england, fill = 'white') +
   # estimate
-  ggplot2::geom_sf(data = before.after.spatial.data, aes(fill = median), colour = 'black') +
+  ggplot2::geom_sf(data = before.after.spatial.lad.data, aes(fill = median), colour = 'black') +
   # facet by group and frame
   ggh4x::facet_nested(exposed ~ timeFrame, switch = 'y') + 
   # set colour
@@ -237,11 +237,11 @@ before.after.spatial.plot <-
   my.map.theme(text = element_text(size = text.size),
                legend.position = 'bottom',
                legend.key.width = unit(2, 'cm'))
-if(spatialPlotSimple){before.after.spatial.plot}
+if(spatialPlotSimple){before.after.spatial.lad.plot}
 
 if(save.image){
-  ggplot2::ggsave(filename = 'beforeAfter_spatialPlot.png',
-                  plot = before.after.spatial.plot,
+  ggplot2::ggsave(filename = 'beforeAfter_spatialPlot_LAD22.png',
+                  plot = before.after.spatial.lad.plot,
                   height = height, width = width)
 }
 
@@ -251,7 +251,9 @@ setwd(res.main.analysis.dir)
 
 ## spatial ----
 
-imd.01.21.lad.average <-
+### lad ----
+
+imd.01.21.average.lad <-
   imd.01.21.lad %>%
   dplyr::filter(YEAR %in% 2009:2021) %>%
   dplyr::summarise(imdScore = imdScore %>% mean(),
@@ -262,29 +264,7 @@ imd.01.21.lad.average <-
                 DEPRIVATION = dplyr::ntile(x = imdRank, n = 10) %>%
                   factor(levels = 1:10, labels = c('1 (Most Deprived)', 2:9, '10 (Least Deprived)')))
 
-standardised.change.national.data <- 
-  theta.predictor %>%
-  # average over exposure-treatment
-  dplyr::summarise(dplyr::across(dplyr::starts_with('theta:'), mean),
-                   .by = c('exposed', 'treatment')) %>%
-  # exposed-treatment label
-  dplyr::mutate(exposed.treatment = interaction(exposed, treatment, sep = '')) %>%
-  # need theta to be in one column not rows
-  tidyr::pivot_longer(cols = dplyr::starts_with('theta:'), names_to = 'theta', names_prefix = 'theta:', values_to = 'value') %>%
-  dplyr::summarise(rho.EA = value[exposed.treatment == 'Exposed1'],
-                   rho.tilde.EB = value[exposed.treatment == 'Exposed0'] * value[exposed.treatment == 'Control1'] / value[exposed.treatment == 'Control0'],
-                   rho = (rho.EA - rho.tilde.EB) / rho.tilde.EB * 100,
-                   .by = c('theta')) %>% 
-  dplyr::select(theta, rho) %>% 
-  # revert theta to columns
-  tidyr::pivot_wider(names_from = 'theta', values_from = 'rho', names_prefix = 'theta:', names_sep = '') %>%
-  dplyr::mutate(dplyr::select(., starts_with('theta:')) %>%
-                  apply(., 1, my.summary) %>% 
-                  lapply(., data.frame) %>%
-                  do.call(rbind, .)) %>%
-  dplyr::select(-starts_with('theta:'))
-
-standardised.change.spatial.data <-
+standardised.change.spatial.lad.data <-
   theta.predictor %>%
   # average over exposure-treatment-ltla
   dplyr::summarise(dplyr::across(dplyr::starts_with('theta:'), mean),
@@ -306,57 +286,83 @@ standardised.change.spatial.data <-
                   do.call(rbind, .)) %>%
   dplyr::select(-starts_with('theta:')) %>%
   dplyr::left_join(., poly.lad.england, by = 'LAD22NM') %>%
-  dplyr::left_join(., imd.01.21.lad.average %>% dplyr::select(LAD22CD, DEPRIVATION), by = 'LAD22CD') %>% 
+  dplyr::left_join(., imd.01.21.average.lad %>% dplyr::select(LAD22CD, DEPRIVATION), by = 'LAD22CD') %>% 
   dplyr::arrange(median) %>%
   dplyr::mutate(space = LAD22NM %>% haven::as_factor(),
                 space_id = space %>% as.numeric()) %>%
   sf::st_as_sf()
 
-standardised.change.spatial.data.largest <-
-  standardised.change.spatial.data %>% 
+standardised.change.spatial.lad.data.largest <-
+  standardised.change.spatial.lad.data %>% 
   dplyr::filter(median == max(median)) %>% 
   dplyr::mutate(label = paste0('Increase:\n', LAD22NM)) 
 
-standardised.change.spatial.data.smallest <- 
-  standardised.change.spatial.data %>% 
+standardised.change.spatial.lad.data.smallest <- 
+  standardised.change.spatial.lad.data %>% 
   dplyr::filter(median == min(median)) %>% 
   dplyr::mutate(label = paste0('Decrease:\n', LAD22NM))
 
-standardised.change.spatial.plot.map <- 
+### national ----
+
+standardised.change.nat.data <- 
+  theta.predictor %>%
+  # average over exposure-treatment
+  dplyr::summarise(dplyr::across(dplyr::starts_with('theta:'), mean),
+                   .by = c('exposed', 'treatment')) %>%
+  # exposed-treatment label
+  dplyr::mutate(exposed.treatment = interaction(exposed, treatment, sep = '')) %>%
+  # need theta to be in one column not rows
+  tidyr::pivot_longer(cols = dplyr::starts_with('theta:'), names_to = 'theta', names_prefix = 'theta:', values_to = 'value') %>%
+  dplyr::summarise(rho.EA = value[exposed.treatment == 'Exposed1'],
+                   rho.tilde.EB = value[exposed.treatment == 'Exposed0'] * value[exposed.treatment == 'Control1'] / value[exposed.treatment == 'Control0'],
+                   rho = (rho.EA - rho.tilde.EB) / rho.tilde.EB * 100,
+                   .by = c('theta')) %>% 
+  dplyr::select(theta, rho) %>% 
+  # revert theta to columns
+  tidyr::pivot_wider(names_from = 'theta', values_from = 'rho', names_prefix = 'theta:', names_sep = '') %>%
+  dplyr::mutate(dplyr::select(., starts_with('theta:')) %>%
+                  apply(., 1, my.summary) %>% 
+                  lapply(., data.frame) %>%
+                  do.call(rbind, .)) %>%
+  dplyr::select(-starts_with('theta:'))
+
+### plot ----
+
+standardised.change.spatial.lad.plot.map <- 
   ggplot2::ggplot() +
   # England outline filled in with white - must be first
   ggplot2::geom_sf(data = poly.nat.england, fill = 'white') +
   # estimate and CI width
-  ggplot2::geom_sf(data = standardised.change.spatial.data, aes(fill = median), colour = 'black') +
+  ggplot2::geom_sf(data = standardised.change.spatial.lad.data, aes(fill = median), colour = 'black') +
   # largest and smallest StandChange
   ## largest 
-  ggrepel::geom_text_repel(data = standardised.change.spatial.data.largest,
+  ggrepel::geom_text_repel(data = standardised.change.spatial.lad.data.largest,
                            aes(label = label, geometry = geometry),
                            stat = 'sf_coordinates',
                            size = 8,
-                           nudge_x = 210000 - standardised.change.spatial.data.largest$BNG_E,
-                           nudge_y = 450000 - standardised.change.spatial.data.largest$BNG_N,
+                           nudge_x = 210000 - standardised.change.spatial.lad.data.largest$BNG_E,
+                           nudge_y = 450000 - standardised.change.spatial.lad.data.largest$BNG_N,
                            min.segment.length = 0) +
   ## smallest 
-  ggrepel::geom_text_repel(data = standardised.change.spatial.data.smallest,
+  ggrepel::geom_text_repel(data = standardised.change.spatial.lad.data.smallest,
                            aes(label = label, geometry = geometry),
                            stat = 'sf_coordinates', 
                            size = 8,
-                           nudge_x = 210000 - standardised.change.spatial.data.smallest$BNG_E,
-                           nudge_y = 210000 - standardised.change.spatial.data.smallest$BNG_N,
+                           nudge_x = 210000 - standardised.change.spatial.lad.data.smallest$BNG_E,
+                           nudge_y = 210000 - standardised.change.spatial.lad.data.smallest$BNG_N,
                            min.segment.length = 0) +
   # set colour
   ggplot2::scale_fill_gradient2(name = 'Standardised \nchange (%)',
                                 low = 'blue3', mid = 'grey', high = 'red3',
-                                midpoint = 0, n.breaks = 4) +
+                                midpoint = 0, n.breaks = 6) +
   my.map.theme(text = element_text(size = text.size),
                legend.position = 'bottom',
                legend.key.width = unit(2, 'cm'))
-if(spatialPlotSimple){standardised.change.spatial.plot.map}
+if(spatialPlotSimple){standardised.change.spatial.lad.plot.map}
 
-standardised.change.spatial.plot.line <-
+standardised.change.spatial.lad.plot.line <-
   ggplot2::ggplot(data = 
-                    standardised.change.spatial.data %>% 
+                    standardised.change.spatial.lad.data %>% 
                     dplyr::mutate(DEPRIVATION2 = dplyr::case_when(DEPRIVATION %in% c('1 (Most Deprived)', 2) ~ '1 (Most Deprived) and 2',
                                                                   DEPRIVATION %in% 3:8 ~ '3 - 8',
                                                                   DEPRIVATION %in% c(9, '10 (Least Deprived)') ~ '9 and 10 (Least Deprived)',
@@ -366,39 +372,37 @@ standardised.change.spatial.plot.line <-
   ggplot2::geom_errorbar(aes(ymin = lower, ymax = upper), width = .05) +
   ggplot2::geom_hline(yintercept = 0, color = 'black', linetype = 'dashed') +
   # set colour
-  # ggplot2::scale_color_viridis_d(direction = 1) +
-  ggplot2::scale_color_manual(name = 'Deprivation Deciles', values = c('red3', 'grey', 'blue3')) +
+  ggplot2::scale_color_manual(name = 'Deprivation', values = c('red3', 'grey', 'blue3')) +
   ggplot2::labs(x = 'Lower Tier Local Authority', y = 'Standardised change (%)') +
   # largest and smallest StandChange
   ## largest 
-  ggrepel::geom_label_repel(data = standardised.change.spatial.data.largest,
+  ggrepel::geom_label_repel(data = standardised.change.spatial.lad.data.largest,
                             aes(label = label), colour = 'black',
                             nudge_x = -75, nudge_y = 0, size = 8) +
   ## smallest 
-  ggrepel::geom_label_repel(data = standardised.change.spatial.data.smallest,
+  ggrepel::geom_label_repel(data = standardised.change.spatial.lad.data.smallest,
                             aes(label = label), colour = 'black',
                             nudge_x = 75, nudge_y = -0, size = 8) +
   # national results
-  ggplot2::geom_hline(yintercept = standardised.change.national.data$median, color = 'black', linetype = 'solid') +
+  ggplot2::geom_hline(yintercept = standardised.change.nat.data$median, color = 'black', linetype = 'solid') +
   ggplot2::annotate(geom = 'text',
-                    label = paste0('National: ', round(standardised.change.national.data$median, 2), 
-                                   '% \n(', round(standardised.change.national.data$lower, 2), '% - ', round(standardised.change.national.data$upper, 2), '%)'),
-                    x = nrow(standardised.change.spatial.data)/4, 
+                    label = paste0('National: ', round(standardised.change.nat.data$median, 2), 
+                                   '% \n(', round(standardised.change.nat.data$lower, 2), '% - ', round(standardised.change.nat.data$upper, 2), '%)'),
+                    x = nrow(standardised.change.spatial.lad.data)/4, 
                     y = 10,
                     color = 'black',
                     size = 8) +
   my.theme(axis.ticks.x = element_blank(),
            axis.text.x = element_blank(),
            legend.position = 'bottom',
-           text = element_text(size = text.size))
-standardised.change.spatial.plot.line
+           text = element_text(size = text.size)); standardised.change.spatial.lad.plot.line
 
 if(save.image){
-  ggplot2::ggsave(filename = 'standardisedChange_spatialPlot_map.png',
-                  plot = standardised.change.spatial.plot.map,
+  ggplot2::ggsave(filename = 'standardisedChange_spatialPlot_LAD22_map.png',
+                  plot = standardised.change.spatial.lad.plot.map,
                   height = height, width = width) 
-  ggplot2::ggsave(filename = 'standardisedChange_spatialPlot_line.png',
-                  plot = standardised.change.spatial.plot.line,
+  ggplot2::ggsave(filename = 'standardisedChange_spatialPlot_LAD22_line.png',
+                  plot = standardised.change.spatial.lad.plot.line,
                   height = height, width = width) 
 }
 
@@ -440,8 +444,7 @@ standardised.change.confounder.data <-
   dplyr::mutate(index = 1:n())
 
 standardised.change.confounder.plot<- 
-  ggplot2::ggplot(standardised.change.confounder.data,
-                  aes(y = index, x = median, group = interaction(parameter, parameter.level))) +
+  ggplot2::ggplot(standardised.change.confounder.data, aes(y = index, x = median)) +
   ggplot2::geom_vline(xintercept = 0, colour = 'red3', linetype = 'dashed') +
   ggplot2::geom_point() +
   ggplot2::geom_errorbar(aes(xmin = lower, xmax = upper), width = .05) +
@@ -449,27 +452,30 @@ standardised.change.confounder.plot<-
                               breaks = 1:31,
                               trans = 'reverse') +
   ggplot2::labs(x = 'Standardised change (%)', y = '') +
+  ggplot2::geom_segment(data = 
+                          data.frame(x = rep(-Inf, times = 5), xend = rep(9, times = 5), 
+                                     y = c(5.5, 8.5, 13.5, 15.5, 27.5), 
+                                     yend = c(5.5, 8.5, 13.5, 15.5, 27.5)),
+                        aes(x = x, xend = xend, y = y, yend = yend), colour = 'grey') + 
   ggplot2::annotate("text",
-                    x = rep(-6.5, lenght.out = 7),
+                    x = rep(-1, lenght.out = 7),
                     # angle = 270,
-                    y = c(3, 7, 11, 14.5, 16.5, 22.5, 29.5),
+                    y = c(1, 6, 9, 14, 16, 18, 28),
                     label = c('Age', 'Eduation', 'Ethnicity', 'Relationship', 'Sex', 'Deprivation', 'Diversity'),
                     fontface = 'bold',
+                    colour = 'grey',
                     size = 4) +
   ggplot2::geom_hline(yintercept = c(17.5)) +
   ggplot2::annotate("text",
-                    x = rep(12, lenght.out = 2),
+                    x = rep(9.5, lenght.out = 2),
                     angle = 270,
                     y = c(8.5, 24),
                     label = c('Individual level\nconfounders', 'Community level\nconfounders'),
                     fontface = 'bold',
                     size = 4) +
-  ggplot2::coord_cartesian(xlim = c(-1.5, 12), clip = 'off') +
   my.theme(legend.title = element_blank(),
            text = element_text(size = text.size),
-           legend.position = 'bottom')
-standardised.change.confounder.plot
-
+           legend.position = 'bottom'); standardised.change.confounder.plot
 
 if(save.image){
   ggplot2::ggsave(filename = 'standardisedChange_confounderPlot.png',
@@ -551,18 +557,18 @@ setwd(res.main.analysis.dir)
 
 all.parameter.data <-
   data.frame(
-    group =
-      c(rep('Control ITS terms', times = 4),
-        rep('Difference ITS terms', times = 4),
-        rep('Relative to [16, 25)', times = 4),
-        rep('Relative to Below GCSE and other', times = 2),
-        rep('Relative to White', times = 4),
-        rep('Relative to Single', times = 1),
-        rep('Relative to Male', times = 1),
-        rep('Deprivation relative to 10 (Least Deprived)', times = 9),
-        rep('Diversity relative to 1 (Least Diverse)', times = 3),
+    covariate =
+      c(rep('Control', times = 4),
+        rep('Difference', times = 4),
+        rep('Age', times = 4),
+        rep('Education', times = 2),
+        rep('Ethnicity', times = 4),
+        rep('Relationship', times = 1),
+        rep('Sex', times = 1),
+        rep('Deprivation', times = 9),
+        rep('Diversity', times = 3),
         rep('Random effect', times = 6)),
-    parameter =
+    covariateLevel =
       c('Intercept', 'Time', 'Intervention', 'Time+',
         'Intercept', 'Time', 'Intervention', 'Time+',
         '[25, 35)', '[35, 45)', '[45, 55)', '[55, 65)',
@@ -587,6 +593,14 @@ print(x = xtable::xtable(all.parameter.data,
 
 ## fixed parameters plot ----
 
+fixed.parameter.reference.data <- 
+  data.frame(level = c('age_id[16, 25):1', 'edu_idBelow GCSE and other:1', 'eth_idWhite:1', 'rela_idSingle:1', 'sex_idMale:1', 'deprivation_id10:1', 'diversity_id1:1'),
+             mean = rep(0, times = 7),
+             variance = rep(0, times = 7),
+             lower = rep(0, times = 7),
+             median = rep(0, times = 7),
+             upper = rep(0, times = 7))
+
 fixed.parameter.data <-
   theta.parameter %>% 
   dplyr::filter(!startsWith(level, 'strata_id'),
@@ -599,6 +613,7 @@ fixed.parameter.data <-
                   lapply(., data.frame) %>%
                   do.call(rbind, .)) %>%
   dplyr::select(-starts_with('theta:')) %>% 
+  dplyr::bind_rows(., fixed.parameter.reference.data) %>% 
   cbind(., 
         covariateLevel = 
           c('Intercept', 'Time', 'Intervention', 'Time+',
@@ -609,17 +624,20 @@ fixed.parameter.data <-
             'Relationship',
             'Female',
             '1 (Most Deprived)', '2', '3', '4', '5', '6', '7', '8', '9',
-            '2', '3', '4 (Most Diverse)'),
-        covariate = c(rep('Control ITS terms', times = 4),
-                      rep('Difference ITS terms', times = 4),
-                      rep('Age relative to [16, 25)', times = 4),
-                      rep('Education relative to Below GCSE and other', times = 2),
-                      rep('Ethnicity relative to White', times = 4),
-                      rep('Relationship relative to Single', times = 1),
-                      rep('Sex relative to Male', times = 1),
-                      rep('Deprivation relative to 10 (Least Deprived)', times = 9),
-                      rep('Diversity relative to 1 (Least Diverse)', times = 3))) %>% 
-  dplyr::mutate(index = 1:n())
+            '2', '3', '4 (Most Diverse)',
+            'Ref. [16, 25)', 'Ref. Below GCSE and other', 'Ref. White', 'Ref. Single', 'Ref. Male', 'Ref. 10 (Least Deprived)', 'Ref. 1 (Least Diverse)'),
+        covariate = c(rep('Control', times = 4),
+                      rep('Difference', times = 4),
+                      rep('Age', times = 4),
+                      rep('Education', times = 2),
+                      rep('Ethnicity', times = 4),
+                      rep('Relationship', times = 1),
+                      rep('Sex', times = 1),
+                      rep('Deprivation', times = 9),
+                      rep('Diversity', times = 3),
+                      'Age', 'Education', 'Ethnicity', 'Relationship', 'Sex', 'Deprivation', 'Diversity')) %>%
+  dplyr::mutate(index = c(1:8, 10:13, 15:16, 17:20, 23, 25, 26:34, 37:39, 9, 14, 21, 22, 24, 35, 36)) %>% 
+  dplyr::arrange(index)
 
 fixed.parameter.table <- 
   fixed.parameter.data %>% 
@@ -630,79 +648,89 @@ fixed.parameter.plot.axis.names <-
   fixed.parameter.data %>%
   dplyr::select(covariate, covariateLevel, index) %>% 
   dplyr::distinct() %>% 
-  dplyr::mutate(label = dplyr::case_when(covariate == 'Control ITS terms' & covariateLevel == 'Intercept' ~ r'(Intercept, $\beta_0$)',
-                                         covariate == 'Control ITS terms' & covariateLevel == 'Time' ~ r'(Time, $\beta_1$)',
-                                         covariate == 'Control ITS terms' & covariateLevel == 'Intervention' ~ r'(Intervention, $\beta_2$)',
-                                         covariate == 'Control ITS terms' & covariateLevel == 'Time+' ~ r'(Time$^{+}$, $\beta_3$)',
-                                         covariate == 'Difference ITS terms' & covariateLevel == 'Intercept' ~ r'(Intercept, $\beta_4$)',
-                                         covariate == 'Difference ITS terms' & covariateLevel == 'Time' ~ r'(Time, $\beta_5$)',
-                                         covariate == 'Difference ITS terms' & covariateLevel == 'Intervention' ~ r'(Intervention, $\beta_6$)',
-                                         covariate == 'Difference ITS terms' & covariateLevel == 'Time+' ~ r'(Time$^{+}$, $\beta_7$)',
+  dplyr::mutate(label = dplyr::case_when(covariate == 'Control' & covariateLevel == 'Intercept' ~ r'(Intercept, $\beta_0$)',
+                                         covariate == 'Control' & covariateLevel == 'Time' ~ r'(Time, $\beta_1$)',
+                                         covariate == 'Control' & covariateLevel == 'Intervention' ~ r'(Intervention, $\beta_2$)',
+                                         covariate == 'Control' & covariateLevel == 'Time+' ~ r'(Time$^{+}$, $\beta_3$)',
+                                         covariate == 'Difference' & covariateLevel == 'Intercept' ~ r'(Intercept, $\beta_4$)',
+                                         covariate == 'Difference' & covariateLevel == 'Time' ~ r'(Time, $\beta_5$)',
+                                         covariate == 'Difference' & covariateLevel == 'Intervention' ~ r'(Intervention, $\beta_6$)',
+                                         covariate == 'Difference' & covariateLevel == 'Time+' ~ r'(Time$^{+}$, $\beta_7$)',
                                          TRUE ~ covariateLevel))
 
 fixed.parameter.plot <-
-  ggplot2::ggplot(fixed.parameter.data,
-                  aes(y = index, x = median, group = interaction(covariate, covariateLevel))) +
+  ggplot2::ggplot(fixed.parameter.data, aes(y = index, x = median)) +
   ggplot2::geom_vline(xintercept = 0, colour = 'red3', linetype = 'dashed') +
   ggplot2::geom_point() +
   ggplot2::geom_errorbar(aes(xmin = lower, xmax = upper), width = .05) +
-  ggplot2::scale_y_continuous(labels = unname(c(latex2exp::TeX(fixed.parameter.plot.axis.names %>% dplyr::filter(covariate %in% c('Control ITS terms', 'Difference ITS terms')) %>% dplyr::pull(label)),
-                                                fixed.parameter.plot.axis.names %>% dplyr::filter(!(covariate %in% c('Control ITS terms', 'Difference ITS terms'))) %>% dplyr::pull(label))),
+  ggplot2::scale_y_continuous(labels = unname(c(latex2exp::TeX(fixed.parameter.plot.axis.names %>% dplyr::filter(covariate %in% c('Control', 'Difference')) %>% dplyr::pull(label)),
+                                                fixed.parameter.plot.axis.names %>% dplyr::filter(!(covariate %in% c('Control', 'Difference'))) %>% dplyr::pull(label))),
                               breaks = 1:nrow(fixed.parameter.plot.axis.names),
                               trans = 'reverse') +
   ggplot2::labs(x = 'Parameter', y = '') +
-  ggplot2::annotate("text",
-                    x = rep(-5.5, lenght.out = 9),
-                    # angle = 270,
-                    y = c(2.5, 6.5, 10.5, 13.5, 16.5, 19, 20, 24.5, 31),
-                    label = c('Control', 'Difference', 'Age', 'Eduation', 'Ethnicity', 'Relationship', 'Sex', 'Deprivation', 'Diversity'),
+  ggplot2::geom_segment(data = 
+                          data.frame(x = rep(-Inf, times = 6), xend = rep(11.5, times = 6), 
+                                     y = c(4.5, 13.5, 16.5, 21.5, 23.5, 35.5), 
+                                     yend = c(4.5, 13.5, 16.5, 21.5, 23.5, 35.5)),
+                        aes(x = x, xend = xend, y = y, yend = yend), colour = 'grey') + 
+  ggplot2::annotate('text',
+                    x = rep(-2.5, times = 9),
+                    y = c(1, 5, 9, 14, 17, 22, 24, 26, 36),
+                    label = c('Control', 'Difference',
+                              'Age', 'Eduation', 'Ethnicity', 'Relationship', 'Sex', 
+                              'Deprivation', 'Diversity'),
                     fontface = 'bold',
-                    size = 4) +
-  ggplot2::geom_hline(yintercept = c(8.5, 20.5)) +
+                    colour = 'grey',
+                    size = 4,
+                    hjust = 0) +
+  ggplot2::geom_hline(yintercept = c(8.5, 25.5)) +
   ggplot2::annotate("text",
-                    x = rep(12, lenght.out = 3),
+                    x = rep(12.5, lenght.out = 3),
                     angle = 270,
-                    y = c(4, 14.5, 27),
+                    y = c(4, 17, 32.5),
                     label = c('Interrupted time\nseries', 'Individual level\nconfounders', 'Community level\nconfounders'),
                     fontface = 'bold',
                     size = 4) +
-  ggplot2::coord_cartesian(xlim = c(-1.5, 12), clip = 'off') +
   my.theme(legend.title = element_blank(),
            text = element_text(size = text.size),
-           legend.position = 'bottom')
-fixed.parameter.plot
+           legend.position = 'bottom'); fixed.parameter.plot
 
 fixed.parameter.data.non.its <-
   fixed.parameter.data %>% 
-  dplyr::filter(!(covariate %in% c('Control ITS terms', 'Difference ITS terms'))) %>% 
+  dplyr::filter(!(covariate %in% c('Control', 'Difference'))) %>% 
   dplyr::mutate(index = 1:n())
 
 fixed.parameter.plot.non.its <-
-  ggplot2::ggplot(fixed.parameter.data.non.its,
-                  aes(y = index, x = median, group = interaction(covariate, covariateLevel))) +
+  ggplot2::ggplot(fixed.parameter.data.non.its, aes(y = index, x = median)) +
   ggplot2::geom_vline(xintercept = 0, colour = 'red3', linetype = 'dashed') +
   ggplot2::geom_point() +
-  ggplot2::geom_errorbar(aes(xmin = lower, xmax = upper), width = .05) +
+  ggplot2::geom_errorbar(aes(xmin = lower, xmax = upper), width = .05) + 
   ggplot2::scale_y_continuous(labels = fixed.parameter.data.non.its$covariateLevel,
-                              breaks = 1:24,
+                              breaks = 1:nrow(fixed.parameter.data.non.its),
                               trans = 'reverse') +
   ggplot2::labs(x = 'Parameter', y = '') +
-  ggplot2::annotate("text",
-                    x = rep(-2.5, lenght.out = 7),
-                    # angle = 270,
-                    y = c(2.5, 5.5, 8.5, 11, 12, 16.5, 23),
-                    label = c('Age', 'Eduation', 'Ethnicity', 'Relationship', 'Sex', 'Deprivation', 'Diversity'),
+  ggplot2::geom_segment(data = 
+                          data.frame(x = rep(-Inf, times = 6), xend = rep(1.4, times = 6), 
+                                     y = c(5.5, 8.5, 13.5, 15.5, 17.5, 27.5), 
+                                     yend = c(5.5, 8.5, 13.5, 15.5, 17.5, 27.5)),
+                        aes(x = x, xend = xend, y = y, yend = yend), colour = 'grey') + 
+  ggplot2::annotate('text',
+                    x = rep(-1.5, times = 7),
+                    y = c(1, 6, 9, 14, 16, 18, 28),
+                    label = c('Age', 'Eduation', 'Ethnicity', 'Relationship', 'Sex', 
+                              'Deprivation', 'Diversity'),
                     fontface = 'bold',
-                    size = 4) +
-  ggplot2::geom_hline(yintercept = 12.5) +
-  ggplot2::annotate("text",
+                    colour = 'grey',
+                    size = 4,
+                    hjust = 0) +
+  ggplot2::geom_hline(yintercept = 17.5) +
+  ggplot2::annotate('text',
                     x = rep(1.5, lenght.out = 2),
                     angle = 270,
-                    y = c(6, 18),
+                    y = c(9, 24.5),
                     label = c('Individual level\nconfounders', 'Community level\nconfounders'),
                     fontface = 'bold',
                     size = 4) +
-  ggplot2::coord_cartesian(xlim = c(-1.5, 1.5), clip = 'off') +
   my.theme(legend.title = element_blank(),
            text = element_text(size = text.size),
            legend.position = 'bottom'); fixed.parameter.plot.non.its
@@ -849,6 +877,56 @@ if(spatialPlotSimple){residual.spatial.plot}
 if(save.image){
   ggplot2::ggsave(filename = 'residual_spatialPlot.png',
                   plot = residual.spatial.plot,
+                  height = height, width = width)
+}
+
+## starta ----
+
+residual.strata.data <-
+  theta.parameter %>% 
+  dplyr::filter(startsWith(level, 'strata_id')) %>%  
+  # relative risk and then summarise
+  dplyr::mutate(dplyr::select(., starts_with('theta:')) %>%
+                  apply(., 1, my.summary) %>% 
+                  lapply(., data.frame) %>%
+                  do.call(rbind, .),
+                index = 1:n()) %>%
+  dplyr::select(-starts_with('theta:'))
+
+residual.strata.plot <-
+  ggplot2::ggplot(data = residual.strata.data, aes(x = index, y = median)) +
+  ggplot2::geom_hline(aes(yintercept = 0), color = 'red3', linetype = 'dashed') +
+  ggplot2::geom_point() +
+  my.theme(); residual.strata.plot
+
+if(save.image){
+  ggplot2::ggsave(filename = 'residual_strataPlot.png',
+                  plot = residual.strata.plot,
+                  height = height, width = width)
+}
+
+## cluster/psu ----
+
+residual.cluster.data <-
+  theta.parameter %>% 
+  dplyr::filter(startsWith(level, 'psu_id')) %>%  
+  # relative risk and then summarise
+  dplyr::mutate(dplyr::select(., starts_with('theta:')) %>%
+                  apply(., 1, my.summary) %>% 
+                  lapply(., data.frame) %>%
+                  do.call(rbind, .),
+                index = 1:n()) %>%
+  dplyr::select(-starts_with('theta:'))
+
+residual.cluster.plot <-
+  ggplot2::ggplot(data = residual.cluster.data, aes(x = index, y = median)) +
+  ggplot2::geom_hline(aes(yintercept = 0), color = 'red3', linetype = 'dashed') +
+  ggplot2::geom_point() +
+  my.theme(); residual.cluster.plot
+
+if(save.image){
+  ggplot2::ggsave(filename = 'residual_clusterPlot.png',
+                  plot = residual.cluster.plot,
                   height = height, width = width)
 }
 
@@ -1023,26 +1101,28 @@ setdiff(poly.lad.england$LAD22NM, ltlaMissing.CA) %>% length()
 
 ## ranked ltla ----
 
-standardised.change.spatial.data.ranked.lad <- 
-  standardised.change.spatial.data %>% 
+standardised.change.spatial.lad.data.ranked <- 
+  standardised.change.spatial.lad.data %>% 
   sf::st_drop_geometry() %>% 
   dplyr::select(LAD22CD, LAD22NM, lower, median, upper) %>% 
   left_join(.,
-            imd.01.21.lad.average,
+            imd.01.21.average.lad,
             by = 'LAD22CD') %>% 
   dplyr::mutate(index = 1:n(),
                 mostDeprived = dplyr::if_else(DEPRIVATION %in% c('1 (Most Deprived)', '2'), 1, 0),
                 leastDeprived = dplyr::if_else(DEPRIVATION %in% c('9', '10 (Least Deprived)'), 1, 0),
                 increaseDecrease = dplyr::if_else(median > 0, 'Increase', 'Decrease'))
 
-total.ltla.with.score <- nrow(standardised.change.spatial.data.ranked.lad)
+total.ltla.with.score <- nrow(standardised.change.spatial.lad.data.ranked)
 
-standardised.change.spatial.data.ranked.lad %>% 
+standardised.change.spatial.lad.data.ranked %>% 
   dplyr::filter(index %in% 1:floor(total.ltla.with.score*0.10)) %>% 
   dplyr::summarise(leastDeprived = mean(leastDeprived)*100,
                    mostDeprived = mean(mostDeprived)*100)
 
-standardised.change.spatial.data.ranked.lad %>% 
+standardised.change.spatial.lad.data.ranked %>% 
   dplyr::filter(index %in% floor(total.ltla.with.score*0.90):total.ltla.with.score) %>% 
   dplyr::summarise(leastDeprived = mean(leastDeprived)*100,
                    mostDeprived = mean(mostDeprived)*100)
+
+table(standardised.change.spatial.lad.data.ranked$increaseDecrease)/nrow(standardised.change.spatial.lad.data.ranked)*100

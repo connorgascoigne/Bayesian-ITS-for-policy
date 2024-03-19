@@ -313,15 +313,15 @@ setwd(res.sensitivity.analysis.dir)
 all.parameter.data <- 
   data.frame(
     group = 
-      c(rep('Control ITS terms', times = 4),
-        rep('Difference ITS terms', times = 4),
-        rep('Relative to [16, 25)', times = 4),
-        rep('Relative to Below GCSE and other', times = 2),
-        rep('Relative to White', times = 4),
-        rep('Relative to Single', times = 1),
-        rep('Relative to Male', times = 1),
-        rep('Deprivation relative to 10 (Least Deprived)', times = 9),
-        rep('Diversity relative to 1 (Least Diverse)', times = 3),
+      c(rep('Control', times = 4),
+        rep('Difference', times = 4),
+        rep('Age', times = 4),
+        rep('Education', times = 2),
+        rep('Ethnicity', times = 4),
+        rep('Relationship', times = 1),
+        rep('Sex', times = 1),
+        rep('Deprivation', times = 9),
+        rep('Diversity', times = 3),
         rep('Random effect', times = 6)),
     parameter = 
       c('Intercept', 'Time', 'Intervention', 'Time+',
@@ -349,6 +349,15 @@ all.parameter.data <-
 
 ### plot ----
 
+fixed.parameter.reference.data <- 
+  data.frame(parameter = rep(c('age_id[16, 25):1', 'edu_idBelow GCSE and other:1', 'eth_idWhite:1', 'rela_idSingle:1', 'sex_idMale:1', 'deprivation_id10:1', 'diversity_id1:1'), times = 2),
+             mean = rep(0, times = 14),
+             variance = rep(0, times = 14),
+             lower = rep(0, times = 14),
+             median = rep(0, times = 14),
+             upper = rep(0, times = 14),
+             data = rep(c('Introduction', 'Contextual Awareness'), each = 7)) 
+
 fixed.parameter.data <- 
   dplyr::bind_rows(theta.predictor.intro$theta.parameter %>% 
                      dplyr::filter(!startsWith(parameter, 'strata_id'),
@@ -369,30 +378,33 @@ fixed.parameter.data <-
                   do.call(rbind, .),
                 data = data %>% factor(., levels = c('Introduction', 'Contextual Awareness'))) %>%
   dplyr::select(-starts_with('theta:')) %>% 
+  dplyr::bind_rows(., fixed.parameter.reference.data) %>% 
   cbind(., 
-        covariateLevel = 
-          rep(c('Intercept', 'Time', 'Intervention', 'Time+',
-                'Intercept', 'Time', 'Intervention', 'Time+',
-                '[25, 35)', '[35, 45)', '[45, 55)', '[55, 65)',
-                'GCSE, A-level or equivalent', 'Degree or higher',
-                'Asian', 'Black', 'Mixed', 'Other',
-                'Relationship',
-                'Female',
-                '1 (Most Deprived)', '2', '3', '4', '5', '6', '7', '8', '9',
-                '2', '3', '4 (Most Diverse)'),
-              times = 2),
-        covariate = 
-          rep(c(rep('Control ITS terms', times = 4),
-                rep('Difference ITS terms', times = 4),
-                rep('Age relative to [16, 25)', times = 4),
-                rep('Education relative to Below GCSE and other', times = 2),
-                rep('Ethnicity relative to White', times = 4),
-                rep('Relationship relative to Single', times = 1),
-                rep('Sex relative to Male', times = 1),
-                rep('Deprivation relative to 10 (Least Deprived)', times = 9),
-                rep('Diversity relative to 1 (Least Diverse)', times = 3)),
-              times = 2)) %>% 
-  dplyr::mutate(index = rep(1:(n()/2), times = 2))
+        covariateLevel = c(rep(c('Intercept', 'Time', 'Intervention', 'Time+',
+                                 'Intercept', 'Time', 'Intervention', 'Time+',
+                                 '[25, 35)', '[35, 45)', '[45, 55)', '[55, 65)',
+                                 'GCSE, A-level or equivalent', 'Degree or higher',
+                                 'Asian', 'Black', 'Mixed', 'Other',
+                                 'Relationship',
+                                 'Female',
+                                 '1 (Most Deprived)', '2', '3', '4', '5', '6', '7', '8', '9',
+                                 '2', '3', '4 (Most Diverse)'), 
+                               times = 2),
+                           rep(c('Ref. [16, 25)', 'Ref. Below GCSE and other', 'Ref. White', 'Ref. Single', 'Ref. Male', 'Ref. 10 (Least Deprived)', 'Ref. 1 (Least Diverse)'),
+                               times = 2)),
+        covariate = c(rep(c(rep('Control', times = 4),
+                            rep('Difference', times = 4),
+                            rep('Age', times = 4),
+                            rep('Education', times = 2),
+                            rep('Ethnicity', times = 4),
+                            rep('Relationship', times = 1),
+                            rep('Sex', times = 1),
+                            rep('Deprivation', times = 9),
+                            rep('Diversity', times = 3)), times = 2),
+                      rep(c('Age', 'Education', 'Ethnicity', 'Relationship', 'Sex', 'Deprivation', 'Diversity'), times = 2))) %>% 
+  dplyr::mutate(index = c(rep(c(1:8, 10:13, 15:16, 17:20, 23, 25, 26:34, 37:39), times = 2),
+                          rep(c(9, 14, 21, 22, 24, 35, 36), times = 2))) %>% 
+  dplyr::arrange(data, index)
 
 fixed.parameter.table <- 
   fixed.parameter.data %>% 
@@ -406,53 +418,58 @@ fixed.parameter.plot.axis.names <-
   fixed.parameter.data %>%
   dplyr::select(covariate, covariateLevel, index) %>% 
   dplyr::distinct() %>% 
-  dplyr::mutate(label = dplyr::case_when(covariate == 'Control ITS terms' & covariateLevel == 'Intercept' ~ r'(Intercept, $\beta_0$)',
-                                         covariate == 'Control ITS terms' & covariateLevel == 'Time' ~ r'(Time, $\beta_1$)',
-                                         covariate == 'Control ITS terms' & covariateLevel == 'Intervention' ~ r'(Intervention, $\beta_2$)',
-                                         covariate == 'Control ITS terms' & covariateLevel == 'Time+' ~ r'(Time$^{+}$, $\beta_3$)',
-                                         covariate == 'Difference ITS terms' & covariateLevel == 'Intercept' ~ r'(Intercept, $\beta_4$)',
-                                         covariate == 'Difference ITS terms' & covariateLevel == 'Time' ~ r'(Time, $\beta_5$)',
-                                         covariate == 'Difference ITS terms' & covariateLevel == 'Intervention' ~ r'(Intervention, $\beta_6$)',
-                                         covariate == 'Difference ITS terms' & covariateLevel == 'Time+' ~ r'(Time$^{+}$, $\beta_7$)',
+  dplyr::mutate(label = dplyr::case_when(covariate == 'Control' & covariateLevel == 'Intercept' ~ r'(Intercept, $\beta_0$)',
+                                         covariate == 'Control' & covariateLevel == 'Time' ~ r'(Time, $\beta_1$)',
+                                         covariate == 'Control' & covariateLevel == 'Intervention' ~ r'(Intervention, $\beta_2$)',
+                                         covariate == 'Control' & covariateLevel == 'Time+' ~ r'(Time$^{+}$, $\beta_3$)',
+                                         covariate == 'Difference' & covariateLevel == 'Intercept' ~ r'(Intercept, $\beta_4$)',
+                                         covariate == 'Difference' & covariateLevel == 'Time' ~ r'(Time, $\beta_5$)',
+                                         covariate == 'Difference' & covariateLevel == 'Intervention' ~ r'(Intervention, $\beta_6$)',
+                                         covariate == 'Difference' & covariateLevel == 'Time+' ~ r'(Time$^{+}$, $\beta_7$)',
                                          TRUE ~ covariateLevel))
 
 fixed.parameter.plot <-
-  ggplot2::ggplot(fixed.parameter.data,
-                  aes(y = median, x = index, group = interaction(covariate, covariateLevel, data), colour = data)) +
+  ggplot2::ggplot(fixed.parameter.data, aes(y = median, x = index, colour = data)) +
   ggplot2::scale_color_manual(values = c('red3', 'blue3')) + 
   ggplot2::geom_hline(yintercept = 0, colour = 'black', linetype = 'dashed') +
   ggplot2::geom_point(position = position_dodge(0.5)) +
   ggplot2::geom_errorbar(aes(ymin = lower, ymax = upper), width = .05, position = position_dodge(0.5)) +
-  ggplot2::scale_x_continuous(labels = unname(c(latex2exp::TeX(fixed.parameter.plot.axis.names %>% dplyr::filter(covariate %in% c('Control ITS terms', 'Difference ITS terms')) %>% dplyr::pull(label)),
-                                                fixed.parameter.plot.axis.names %>% dplyr::filter(!(covariate %in% c('Control ITS terms', 'Difference ITS terms'))) %>% dplyr::pull(label))),
+  ggplot2::scale_x_continuous(labels = unname(c(latex2exp::TeX(fixed.parameter.plot.axis.names %>% dplyr::filter(covariate %in% c('Control', 'Difference')) %>% dplyr::pull(label)),
+                                                fixed.parameter.plot.axis.names %>% dplyr::filter(!(covariate %in% c('Control', 'Difference'))) %>% dplyr::pull(label))),
                               breaks = 1:nrow(fixed.parameter.plot.axis.names),
                               trans = 'reverse') +
-  ggplot2::labs(x = '', y = 'Parameter') +
-  ggplot2::annotate("text",
-                    y = rep(-5.5, lenght.out = 9),
-                    # angle = 270,
-                    x = c(2.5, 6.5, 10.5, 13.5, 16.5, 19, 20, 24.5, 31),
-                    label = c('Control', 'Difference', 'Age', 'Eduation', 'Ethnicity', 'Relationship', 'Sex', 'Deprivation', 'Diversity'),
+  ggplot2::labs(x = 'Parameter', y = '') +
+  ggplot2::geom_segment(data = 
+                          data.frame(y = rep(-Inf, times = 6), yend = rep(11.5, times = 6), 
+                                     x = c(4.5, 13.5, 16.5, 21.5, 23.5, 35.5), 
+                                     xend = c(4.5, 13.5, 16.5, 21.5, 23.5, 35.5)),
+                        aes(x = x, xend = xend, y = y, yend = yend), colour = 'grey') + 
+  ggplot2::annotate('text',
+                    y = rep(-2.5, times = 9),
+                    x = c(1, 5, 9, 14, 17, 22, 24, 26, 36),
+                    label = c('Control', 'Difference',
+                              'Age', 'Eduation', 'Ethnicity', 'Relationship', 'Sex', 
+                              'Deprivation', 'Diversity'),
                     fontface = 'bold',
-                    size = 4) +
-  ggplot2::geom_vline(xintercept = c(8.5, 20.5)) +
+                    colour = 'grey',
+                    size = 4,
+                    hjust = 0) +
+  ggplot2::geom_vline(xintercept = c(8.5, 25.5)) +
   ggplot2::annotate("text",
-                    y = rep(12, lenght.out = 3),
+                    y = rep(12.5, lenght.out = 3),
                     angle = 270,
-                    x = c(4, 14.5, 27),
+                    x = c(4, 17, 32.5),
                     label = c('Interrupted time\nseries', 'Individual level\nconfounders', 'Community level\nconfounders'),
                     fontface = 'bold',
                     size = 4) +
-  # ggplot2::coord_cartesian(ylim = c(-1.5, 12), clip = 'off') +
-  ggplot2::coord_flip(ylim = c(-1.5, 12), clip = 'off') +
+  ggplot2::coord_flip() +
   my.theme(legend.title = element_blank(),
            text = element_text(size = text.size),
-           legend.position = 'bottom')
-fixed.parameter.plot
+           legend.position = 'bottom'); fixed.parameter.plot
 
 fixed.parameter.data.non.its <-
   fixed.parameter.data %>% 
-  dplyr::filter(!(covariate %in% c('Control ITS terms', 'Difference ITS terms'))) %>% 
+  dplyr::filter(!(covariate %in% c('Control', 'Difference'))) %>% 
   dplyr::mutate(index = rep(1:(n()/2), times = 2))
 
 fixed.parameter.plot.non.its.axis.names <- 
@@ -462,8 +479,7 @@ fixed.parameter.plot.non.its.axis.names <-
   dplyr::pull(covariateLevel)
 
 fixed.parameter.plot.non.its <-
-  ggplot2::ggplot(fixed.parameter.data.non.its,
-                  aes(y = median, x = index, group = interaction(covariate, covariateLevel, data), colour = data)) +
+  ggplot2::ggplot(fixed.parameter.data.non.its, aes(y = median, x = index, colour = data)) +
   ggplot2::scale_color_manual(values = c('red3', 'blue3')) + 
   ggplot2::geom_hline(yintercept = 0, colour = 'black', linetype = 'dashed') +
   ggplot2::geom_point(position = position_dodge(0.5)) +
@@ -471,24 +487,30 @@ fixed.parameter.plot.non.its <-
   ggplot2::scale_x_continuous(labels = fixed.parameter.plot.non.its.axis.names,
                               breaks = 1:length(fixed.parameter.plot.non.its.axis.names),
                               trans = 'reverse') +
-  ggplot2::labs(x = '', y = 'Parameter') +
-  ggplot2::annotate("text",
-                    y = rep(-2.5, lenght.out = 7),
-                    # angle = 270,
-                    x = c(2.5, 5.5, 8.5, 11, 12, 16.5, 23),
-                    label = c('Age', 'Eduation', 'Ethnicity', 'Relationship', 'Sex', 'Deprivation', 'Diversity'),
+  ggplot2::labs(x = 'Parameter', y = '') +
+  ggplot2::geom_segment(data = 
+                          data.frame(y = rep(-Inf, times = 6), yend = rep(1.4, times = 6), 
+                                     x = c(5.5, 8.5, 13.5, 15.5, 17.5, 27.5), 
+                                     xend = c(5.5, 8.5, 13.5, 15.5, 17.5, 27.5)),
+                        aes(x = x, xend = xend, y = y, yend = yend), colour = 'grey') + 
+  ggplot2::annotate('text',
+                    y = rep(-1.5, times = 7),
+                    x = c(1, 6, 9, 14, 16, 18, 28),
+                    label = c('Age', 'Eduation', 'Ethnicity', 'Relationship', 'Sex', 
+                              'Deprivation', 'Diversity'),
                     fontface = 'bold',
-                    size = 4) +
-  ggplot2::geom_vline(xintercept = 12.5) +
-  ggplot2::annotate("text",
+                    colour = 'grey',
+                    size = 4,
+                    hjust = 0) +
+  ggplot2::geom_vline(xintercept = 17.5) +
+  ggplot2::annotate('text',
                     y = rep(1.5, lenght.out = 2),
                     angle = 270,
-                    x = c(6, 18),
+                    x = c(9, 24.5),
                     label = c('Individual level\nconfounders', 'Community level\nconfounders'),
                     fontface = 'bold',
                     size = 4) +
-  # ggplot2::coord_cartesian(ylim = c(-1.5, 12), clip = 'off') +
-  ggplot2::coord_flip(ylim = c(-1.5, 1.5), clip = 'off') +
+  ggplot2::coord_flip() +
   my.theme(legend.title = element_blank(),
            text = element_text(size = text.size),
            legend.position = 'bottom'); fixed.parameter.plot.non.its
